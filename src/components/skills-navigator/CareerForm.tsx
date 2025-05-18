@@ -39,25 +39,29 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsLoading(false); 
+    // This effect runs when `state` (from useActionState) changes,
+    // or when onFormSubmitSuccess, toast, or setIsLoading references change.
+    // The primary trigger should be `state` changing after the action completes.
+
+    // Crucially, set loading to false once the action is done (state has updated).
+    setIsLoading(false);
 
     if (state?.message) {
-        if (state.success && state.data) {
-            onFormSubmitSuccess(state.data, state.reportType || 'free');
-            toast({
-                title: "Success!",
-                description: state.message,
-            });
-        } else if (!state.success) {
-            toast({
-                title: "Error",
-                description: state.message || "An unexpected error occurred.",
-                variant: "destructive",
-            });
-        }
+      if (state.success && state.data) {
+        onFormSubmitSuccess(state.data, state.reportType || 'free');
+        toast({
+          title: 'Success!',
+          description: state.message,
+        });
+      } else if (!state.success) {
+        toast({
+          title: 'Error',
+          description: state.message || 'An unexpected error occurred.',
+          variant: 'destructive',
+        });
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, onFormSubmitSuccess, toast]); 
+  }, [state, onFormSubmitSuccess, toast, setIsLoading]); // Added setIsLoading to dependency array
 
   const handleFormAction = (formData: FormData) => {
     setIsLoading(true);
@@ -140,6 +144,8 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-4">
           <SubmitButton />
+          {/* Hidden input to ensure reportType is always 'free' from this form */}
+          <input type="hidden" name="reportType" value="free" />
           {state?.message && !state.success && (
             <p className="text-sm text-destructive flex items-center mt-4 p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />

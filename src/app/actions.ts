@@ -87,7 +87,7 @@ export async function submitCareerFormAction(
     return {
       message: "Failed to generate career path. Please try again later.",
       success: false,
-      reportType: validatedReportType,
+      reportType: validatedReportType, // Corrected from reportType
     };
   }
 }
@@ -124,6 +124,7 @@ export async function emailResultsAction(
   console.log(`Emailing results to: ${email}`);
   console.log(`Content:\n${resultsText}`);
   
+  // Simulate email sending
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   return {
@@ -131,5 +132,3 @@ export async function emailResultsAction(
     success: true,
   };
 }
-
-    
