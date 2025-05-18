@@ -37,17 +37,17 @@ const prompt = ai.definePrompt({
   output: {schema: CareerPathOutputSchema},
   prompt: `You are a career counselor specializing in providing tailored career guidance. Based on the user's field of study and career interests, generate a career path with relevant job roles, skills, and learning resources.
 
-  Field of Study: {{{fieldOfStudy}}}
-  Career Interests: {{{careerInterests}}}
+Field of Study: {{{fieldOfStudy}}}
+Career Interests: {{{careerInterests}}}
 
-  Output:
-  - Job Roles (2-3):
-  - Technical Skills:
-  - Soft Skills:
-  - Tools/Platforms to Learn:
-  - Course Suggestions (2-3 course titles):
-  - Beginner Project Idea:
-  `,
+Output:
+- Job Roles (2-3):
+- Technical Skills:
+- Soft Skills:
+- Tools/Platforms to Learn:
+- Course Suggestions (2-3 course titles):
+- Beginner Project Idea:
+`,
 });
 
 const generateCareerPathFlow = ai.defineFlow(
@@ -61,3 +61,4 @@ const generateCareerPathFlow = ai.defineFlow(
     return output!;
   }
 );
+
