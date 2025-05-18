@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -15,8 +16,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Lume',
-  description: 'Generate tailored career guidance for your skills and interests with Lume.',
+  title: {
+    template: '%s | Lume',
+    default: 'Lume - Your AI Career Navigator',
+  },
+  description: 'Lume helps you discover personalized career paths using AI. Explore your potential and find the right career for you.',
+  icons: { // Example: Add a favicon if you have one in /public
+    // icon: '/favicon.ico', 
+  }
 };
 
 export default function RootLayout({
@@ -40,3 +47,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    
