@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -5,8 +6,9 @@ import { CareerForm } from '@/components/skills-navigator/CareerForm';
 import { CareerPathDisplay } from '@/components/skills-navigator/CareerPathDisplay';
 import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
 import { Button } from '@/components/ui/button';
-import { Loader2, Navigation, Github, Palette } from 'lucide-react';
+import { Loader2, Navigation, Github, Palette, ShieldCheck } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
+import Link from 'next/link';
 
 export default function LumePage() {
   const [careerPathData, setCareerPathData] = useState<CareerPathOutput | null>(null);
@@ -34,6 +36,11 @@ export default function LumePage() {
           </div>
           <div className="flex items-center space-x-2">
             <ModeToggle />
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/admin" aria-label="Admin Dashboard">
+                <ShieldCheck className="h-5 w-5" />
+              </Link>
+            </Button>
             <Button variant="ghost" size="icon" asChild>
               <a href="https://github.com/firebase/genkit/tree/main/studio" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
                 <Github className="h-5 w-5" />
