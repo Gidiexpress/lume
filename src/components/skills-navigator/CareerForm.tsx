@@ -1,7 +1,8 @@
+
 'use client';
 
-import React, { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import React, { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,7 +34,7 @@ function SubmitButton() {
 
 export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProps) {
   const initialState: FormState = { message: null, success: false, data: null };
-  const [state, formAction] = useFormState(submitCareerFormAction, initialState);
+  const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
   const { pending } = useFormStatus(); // Direct usage to reflect button's pending state
 
