@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { findAffiliateLink } from '@/lib/affiliateLinks';
 import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
-  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, LightbulbFilament
+  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -419,7 +419,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
             </div>
           </SectionCard>
 
-          <SectionCard title="Sample Project Ideas" icon={LightbulbFilament}>
+          <SectionCard title="Sample Project Ideas" icon={Lightbulb}>
              <Accordion type="single" collapsible className="w-full">
               {premiumData.sampleProjects.map((proj, index) => (
                 <AccordionItem value={`proj-${index}`} key={index}>
@@ -520,4 +520,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     </div>
   );
 }
+    
+
     
