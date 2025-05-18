@@ -1,12 +1,18 @@
-// 'use server'
+
 'use server';
 
 import { z } from 'zod';
 import { generateCareerPath, type CareerPathInput, type CareerPathOutput } from '@/ai/flows/career-path-generator';
 
 const CareerFormSchema = z.object({
+  fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  university: z.string().min(3, { message: "University/Institution must be at least 3 characters." }),
   fieldOfStudy: z.string().min(3, { message: "Field of study must be at least 3 characters." }),
-  careerInterests: z.string().optional(),
+  currentSkills: z.string().optional(),
+  desiredCareerPath: z.string().optional(),
+  learningPreference: z.string().min(3, { message: "Learning preference must be at least 3 characters." }),
+  reportType: z.enum(['free', 'premium'], { message: "Invalid report type selected." }),
 });
 
 export interface FormState {
@@ -15,15 +21,24 @@ export interface FormState {
   issues?: string[];
   data?: CareerPathOutput | null;
   success: boolean;
+  reportType?: 'free' | 'premium';
 }
 
 export async function submitCareerFormAction(
   prevState: FormState | undefined,
   formData: FormData
 ): Promise<FormState> {
+  const reportType = formData.get('reportType') as ('free' | 'premium' | null);
+
   const validatedFields = CareerFormSchema.safeParse({
+    fullName: formData.get('fullName'),
+    email: formData.get('email'),
+    university: formData.get('university'),
     fieldOfStudy: formData.get('fieldOfStudy'),
-    careerInterests: formData.get('careerInterests'),
+    currentSkills: formData.get('currentSkills'),
+    desiredCareerPath: formData.get('desiredCareerPath'),
+    learningPreference: formData.get('learningPreference'),
+    reportType: reportType,
   });
 
   if (!validatedFields.success) {
@@ -32,26 +47,47 @@ export async function submitCareerFormAction(
       message: "Invalid form data. " + issues.join(' '),
       issues,
       success: false,
+      reportType: reportType || 'free',
     };
+  }
+  
+  const { reportType: validatedReportType, ...careerInputs } = validatedFields.data;
+
+  // For now, premium report button won't trigger payment or a different AI flow.
+  // This will be implemented in a future step.
+  if (validatedReportType === 'premium') {
+    // Placeholder for premium logic/payment check
+    console.log("Premium report requested. Payment and specialized AI flow to be implemented.");
+    // For now, it will proceed like a free report.
   }
 
   const input: CareerPathInput = {
-    fieldOfStudy: validatedFields.data.fieldOfStudy,
-    careerInterests: validatedFields.data.careerInterests || undefined,
+    fullName: careerInputs.fullName,
+    email: careerInputs.email,
+    university: careerInputs.university,
+    fieldOfStudy: careerInputs.fieldOfStudy,
+    currentSkills: careerInputs.currentSkills || undefined,
+    desiredCareerPath: careerInputs.desiredCareerPath || undefined,
+    learningPreference: careerInputs.learningPreference,
+    // careerInterests: validatedFields.data.careerInterests || undefined, // This field was removed from new form
   };
 
   try {
-    const careerPath = await generateCareerPath(input);
+    // For now, all requests go to the same generator.
+    // Future: if (validatedReportType === 'premium') { callPremiumGenerator(input); } else { callFreeGenerator(input); }
+    const careerPath = await generateCareerPath(input); 
     return {
-      message: "Career path generated successfully!",
+      message: `${validatedReportType === 'premium' ? 'Premium' : 'Free'} career path generated successfully! (Note: Premium features are under development)`,
       data: careerPath,
       success: true,
+      reportType: validatedReportType,
     };
   } catch (error) {
     console.error("Error generating career path:", error);
     return {
       message: "Failed to generate career path. Please try again later.",
       success: false,
+      reportType: validatedReportType,
     };
   }
 }
@@ -85,12 +121,9 @@ export async function emailResultsAction(
   
   const { email, resultsText } = validatedFields.data;
 
-  // In a real application, you would integrate an email sending service here.
-  // For this example, we'll just log it to the console.
   console.log(`Emailing results to: ${email}`);
   console.log(`Content:\n${resultsText}`);
   
-  // Simulate email sending
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   return {
@@ -98,3 +131,5 @@ export async function emailResultsAction(
     success: true,
   };
 }
+
+    
