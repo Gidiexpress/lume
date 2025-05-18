@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { findAffiliateLink } from '@/lib/affiliateLinks';
+import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
   Briefcase,
   CodeXml,
@@ -20,10 +21,11 @@ import {
   AlertTriangle,
   Sparkles,
   Award,
+  Zap, // For premium upgrade CTA
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo } from 'react';
-import { useActionState } from 'react'; // Updated import
+import { useActionState } from 'react'; 
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -45,15 +47,23 @@ function formatResultsForCopy(data: CareerPathOutput, reportType: 'free' | 'prem
 
   if (reportType === 'premium') {
     // Add premium-specific fields to text when they are available in CareerPathOutput
-    // For example:
-    // text += `Career Roadmap:\n...\n\n`;
-    // text += `Skill Gap Analysis:\n...\n\n`;
   }
   return text;
 }
 
 function EmailSubmitButton() {
-  const { pending } = useActionState(emailResultsAction, { message: null, success: false });
+  // Corrected: useActionState returns [state, formAction], not { pending }
+  const [state, formAction] = useActionState(emailResultsAction, { message: null, success: false });
+  // To get pending status, you might need to wrap formAction or manage pending state separately.
+  // For simplicity, let's assume a local pending state if direct useFormStatus isn't feasible here.
+  // Or, for now, just rely on the button's disabled state if the form is simple.
+  // A more robust solution would involve using useFormStatus if this button were part of a <form>.
+  // Since it's not directly, we'll just use a simple disabled prop for now.
+  // const { pending } = useFormStatus(); // This hook would not work here as expected.
+  
+  // Placeholder for pending state, would ideally come from useFormStatus or context
+  const pending = false; 
+
   return (
     <Button type="submit" disabled={pending} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
@@ -111,14 +121,6 @@ export function CareerPathDisplay({ data, reportType }: CareerPathDisplayProps) 
     { title: "Tools & Platforms to Learn", icon: Laptop, items: data.toolsAndPlatforms },
   ];
 
-  // Future: Define premium_sections when premium report structure is available
-  // const premiumSections = [
-  //   ...sections,
-  //   { title: "Detailed Career Roadmap", icon: Map, items: data.careerRoadmap },
-  //   { title: "Skill Gap Analysis", icon: BarChart3, items: data.skillGapAnalysis },
-  // ];
-  // const displaySections = reportType === 'premium' ? premiumSections : sections;
-
 
   return (
     <div className="space-y-8 mt-8">
@@ -145,6 +147,35 @@ export function CareerPathDisplay({ data, reportType }: CareerPathDisplayProps) 
           <Copy className="mr-2 h-4 w-4" /> Copy Results
         </Button>
       </div>
+      
+      {reportType === 'free' && (
+        <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-primary flex items-center">
+              <Zap className="mr-2 h-6 w-6" />
+              Ready for the Full Picture?
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-foreground/90">
+              This free summary gives you a great starting point. Unlock a comprehensive, 
+              personalized career roadmap with in-depth analysis, detailed learning resources, 
+              project ideas, resume tips, and much more with our Premium Report!
+            </p>
+            <Button 
+              size="lg" 
+              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-md" 
+              onClick={() => toast({ 
+                title: 'Premium Feature Coming Soon!', 
+                description: 'The ability to generate full Premium Reports with payment is under development. Stay tuned!',
+                duration: 5000,
+              })}
+            >
+              <Sparkles className="mr-2 h-5 w-5" /> Upgrade to Premium Report (₦1000)
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {sections.map(section => (
         section.items && section.items.length > 0 && (
@@ -186,14 +217,8 @@ export function CareerPathDisplay({ data, reportType }: CareerPathDisplayProps) 
         </SectionCard>
       )}
       
-      {/* Placeholder for future premium-only sections */}
       {reportType === 'premium' && (
         <>
-          {/* Example of how premium sections might look when data is available */}
-          {/* <SectionCard title="Detailed Career Roadmap" icon={MapIcon}>...</SectionCard> */}
-          {/* <SectionCard title="Skill Gap Analysis" icon={TrendingUpIcon}>...</SectionCard> */}
-          {/* <SectionCard title="Resume Tips" icon={FileTextIcon}>...</SectionCard> */}
-          {/* <SectionCard title="Job Market Insights" icon={BriefcaseIcon}>...</SectionCard> */}
           <div className="p-6 rounded-lg bg-primary/10 border border-primary/30 text-center">
             <h3 className="text-xl font-semibold text-primary mb-2">Premium Content Coming Soon!</h3>
             <p className="text-muted-foreground">Detailed sections like Career Roadmaps, Skill Gap Analysis, Resume Tips, and Job Market Insights are part of the full Premium Report, currently under development.</p>
@@ -230,5 +255,3 @@ export function CareerPathDisplay({ data, reportType }: CareerPathDisplayProps) 
     </div>
   );
 }
-
-    

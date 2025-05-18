@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useActionState } from 'react'; // Updated import
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,27 +19,17 @@ interface CareerFormProps {
   setIsLoading: (loading: boolean) => void;
 }
 
-function SubmitButtons() {
+function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <div className="flex flex-col sm:flex-row gap-4 w-full">
-      <Button type="submit" name="reportType" value="free" disabled={pending} className="w-full flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground">
-        {pending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <Sparkles className="mr-2 h-4 w-4" />
-        )}
-        Get Free Report
-      </Button>
-      <Button type="submit" name="reportType" value="premium" disabled={pending} className="w-full flex-1 bg-primary hover:bg-primary/90">
-        {pending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <Sparkles className="mr-2 h-4 w-4" />
-        )}
-        Get Premium Report (₦1000)
-      </Button>
-    </div>
+    <Button type="submit" name="reportType" value="free" disabled={pending} className="w-full bg-primary hover:bg-primary/90">
+      {pending ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        <Sparkles className="mr-2 h-4 w-4" />
+      )}
+      Get Your Free Career Summary
+    </Button>
   );
 }
 
@@ -47,14 +37,9 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
   const initialState: FormState = { message: null, success: false, data: null, reportType: 'free' };
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
-  // const { pending } = useFormStatus(); // This hook only works if the component is a direct child of form. SubmitButtons has it.
 
   useEffect(() => {
-    // The `pending` state needs to be derived from the action's state or passed down if SubmitButtons is separate.
-    // For now, we'll rely on `state` updates to eventually reflect loading changes.
-    // A more robust way might involve a local loading state tied to form submission initiation and `state` resolution.
-    setIsLoading(false); // Reset loading when state changes, actual loading is handled by formStatus in SubmitButtons
-                        // Or, more accurately, setIsLoading should be true when formAction is called and false when state updates.
+    setIsLoading(false); 
 
     if (state?.message) {
         if (state.success && state.data) {
@@ -72,7 +57,7 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
         }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, onFormSubmitSuccess, toast]); // Removed setIsLoading from deps as it's handled differently now
+  }, [state, onFormSubmitSuccess, toast]); 
 
   const handleFormAction = (formData: FormData) => {
     setIsLoading(true);
@@ -88,7 +73,7 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
           Discover Your Career Path with Lume
         </CardTitle>
         <CardDescription className="text-center">
-          Fill in your details to get personalized career guidance. Choose between a free summary or a comprehensive premium report.
+          Fill in your details to get a free personalized career summary.
         </CardDescription>
       </CardHeader>
       <form action={handleFormAction}>
@@ -154,7 +139,7 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
 
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-4">
-          <SubmitButtons />
+          <SubmitButton />
           {state?.message && !state.success && (
             <p className="text-sm text-destructive flex items-center mt-4 p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -166,5 +151,3 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
     </Card>
   );
 }
-
-    
