@@ -19,8 +19,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
-import React, { useState, useMemo } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import React, { useState, useMemo, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 
@@ -55,7 +55,7 @@ export function CareerPathDisplay({ data }: CareerPathDisplayProps) {
   const [email, setEmail] = useState('');
 
   const initialEmailState: EmailFormState = { message: null, success: false };
-  const [emailFormState, dispatchEmailAction] = useFormState(emailResultsAction, initialEmailState);
+  const [emailFormState, dispatchEmailAction] = useActionState(emailResultsAction, initialEmailState);
   
   const resultsTextForEmail = useMemo(() => formatResultsForCopy(data), [data]);
 
