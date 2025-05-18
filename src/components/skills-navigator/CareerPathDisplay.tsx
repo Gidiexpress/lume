@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 
@@ -29,7 +28,7 @@ interface CareerPathDisplayProps {
 }
 
 function formatResultsForCopy(data: CareerPathOutput): string {
-  let text = `Skills Navigator - Your Career Path\n\n`;
+  let text = `Lume - Your Career Path\n\n`;
   text += `Job Roles:\n- ${data.jobRoles.join('\n- ')}\n\n`;
   text += `Technical Skills:\n- ${data.technicalSkills.join('\n- ')}\n\n`;
   text += `Soft Skills:\n- ${data.softSkills.join('\n- ')}\n\n`;
@@ -40,7 +39,7 @@ function formatResultsForCopy(data: CareerPathOutput): string {
 }
 
 function EmailSubmitButton() {
-  const { pending } = useFormStatus();
+  const { pending } = useActionState(emailResultsAction, { message: null, success: false }); // Placeholder initial state for pending status
   return (
     <Button type="submit" disabled={pending} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Navigation, Github, Palette } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 
-export default function SkillsNavigatorPage() {
+export default function LumePage() {
   const [careerPathData, setCareerPathData] = useState<CareerPathOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export default function SkillsNavigatorPage() {
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Navigation className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Skills Navigator</h1>
+            <h1 className="text-2xl font-bold">Lume</h1>
           </div>
           <div className="flex items-center space-x-2">
             <ModeToggle />
@@ -82,7 +82,7 @@ export default function SkillsNavigatorPage() {
       </main>
 
       <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
-        <p>&copy; {new Date().getFullYear()} Skills Navigator. Powered by AI.</p>
+        <p>&copy; {new Date().getFullYear()} Lume. Powered by AI.</p>
       </footer>
     </div>
   );

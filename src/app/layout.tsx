@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Skills Navigator',
-  description: 'Generate tailored career guidance for your skills and interests.',
+  title: 'Lume',
+  description: 'Generate tailored career guidance for your skills and interests with Lume.',
 };
 
 export default function RootLayout({
