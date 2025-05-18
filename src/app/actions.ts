@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { generateCareerPath, type CareerPathInput, type CareerPathOutput } from '@/ai/flows/career-path-generator';
+import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator'; // Import premium generator
 
 const CareerFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -15,11 +16,23 @@ const CareerFormSchema = z.object({
   reportType: z.enum(['free', 'premium'], { message: "Invalid report type selected." }),
 });
 
+// This input schema is used by generatePremiumReportAction when it receives direct object input
+const PremiumReportInputSchema = z.object({
+  fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  university: z.string().min(3, { message: "University/Institution must be at least 3 characters." }),
+  fieldOfStudy: z.string().min(3, { message: "Field of study must be at least 3 characters." }),
+  currentSkills: z.string().optional(),
+  desiredCareerPath: z.string().optional(),
+  learningPreference: z.string().min(3, { message: "Learning preference must be at least 3 characters." }),
+});
+
+
 export interface FormState {
   message: string | null;
   fields?: Record<string, string>;
   issues?: string[];
-  data?: CareerPathOutput | null;
+  data?: CareerPathOutput | PremiumCareerPathOutput | null; // Can hold free or premium data
   success: boolean;
   reportType?: 'free' | 'premium';
 }
@@ -28,8 +41,7 @@ export async function submitCareerFormAction(
   prevState: FormState | undefined,
   formData: FormData
 ): Promise<FormState> {
-  const reportType = formData.get('reportType') as ('free' | 'premium' | null);
-
+  // This action is now only for FREE reports from the main form
   const validatedFields = CareerFormSchema.safeParse({
     fullName: formData.get('fullName'),
     email: formData.get('email'),
@@ -38,7 +50,7 @@ export async function submitCareerFormAction(
     currentSkills: formData.get('currentSkills'),
     desiredCareerPath: formData.get('desiredCareerPath'),
     learningPreference: formData.get('learningPreference'),
-    reportType: reportType,
+    reportType: 'free', // Hardcode to free as this form is for free reports
   });
 
   if (!validatedFields.success) {
@@ -47,19 +59,11 @@ export async function submitCareerFormAction(
       message: "Invalid form data. " + issues.join(' '),
       issues,
       success: false,
-      reportType: reportType || 'free',
+      reportType: 'free',
     };
   }
   
-  const { reportType: validatedReportType, ...careerInputs } = validatedFields.data;
-
-  // For now, premium report button won't trigger payment or a different AI flow.
-  // This will be implemented in a future step.
-  if (validatedReportType === 'premium') {
-    // Placeholder for premium logic/payment check
-    console.log("Premium report requested. Payment and specialized AI flow to be implemented.");
-    // For now, it will proceed like a free report.
-  }
+  const { reportType, ...careerInputs } = validatedFields.data;
 
   const input: CareerPathInput = {
     fullName: careerInputs.fullName,
@@ -69,25 +73,81 @@ export async function submitCareerFormAction(
     currentSkills: careerInputs.currentSkills || undefined,
     desiredCareerPath: careerInputs.desiredCareerPath || undefined,
     learningPreference: careerInputs.learningPreference,
-    // careerInterests: validatedFields.data.careerInterests || undefined, // This field was removed from new form
   };
 
   try {
-    // For now, all requests go to the same generator.
-    // Future: if (validatedReportType === 'premium') { callPremiumGenerator(input); } else { callFreeGenerator(input); }
     const careerPath = await generateCareerPath(input); 
     return {
-      message: `${validatedReportType === 'premium' ? 'Premium' : 'Free'} career path generated successfully! (Note: Premium features are under development)`,
+      message: 'Free career path generated successfully!',
       data: careerPath,
       success: true,
-      reportType: validatedReportType,
+      reportType: 'free',
     };
   } catch (error) {
-    console.error("Error generating career path:", error);
+    console.error("Error generating free career path:", error);
     return {
-      message: "Failed to generate career path. Please try again later.",
+      message: "Failed to generate free career path. Please try again later.",
       success: false,
-      reportType: validatedReportType, // Corrected from reportType
+      reportType: 'free',
+    };
+  }
+}
+
+export async function generatePremiumReportAction(
+  prevState: FormState | undefined,
+  inputData: CareerPathInput // Accepts CareerPathInput directly
+): Promise<FormState> {
+  // Validate the inputData using the schema for premium report input
+  // This ensures the data structure is correct before passing to the AI flow
+  const validatedFields = PremiumReportInputSchema.safeParse(inputData);
+
+  if (!validatedFields.success) {
+    const issues = validatedFields.error.issues.map((issue) => issue.message);
+    return {
+      message: "Invalid input data for premium report. " + issues.join(' '),
+      issues,
+      success: false,
+      reportType: 'premium',
+    };
+  }
+
+  // Simulate payment check
+  console.log("Premium report requested for:", validatedFields.data.email, "- Simulating payment verification...");
+  // In a real app, integrate payment gateway here. For now, we assume payment is successful.
+  const paymentSuccessful = true; 
+
+  if (!paymentSuccessful) {
+    return {
+      message: "Payment failed or was not completed. Please try again.",
+      success: false,
+      reportType: 'premium',
+    };
+  }
+
+  console.log("Payment successful (simulated). Generating premium report...");
+
+  try {
+    // Pass validated data to the premium career path generator
+    const premiumCareerPath = await generatePremiumCareerPath(validatedFields.data);
+    return {
+      message: 'Premium career path generated successfully!',
+      data: premiumCareerPath,
+      success: true,
+      reportType: 'premium',
+    };
+  } catch (error) {
+    console.error("Error generating premium career path:", error);
+    // Check if error is an object and has a message property
+    let errorMessage = "Failed to generate premium career path. Please try again later.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    return {
+      message: errorMessage,
+      success: false,
+      reportType: 'premium',
     };
   }
 }
@@ -132,3 +192,5 @@ export async function emailResultsAction(
     success: true,
   };
 }
+
+    

@@ -1,44 +1,98 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useActionState } from 'react';
 import { CareerForm } from '@/components/skills-navigator/CareerForm';
 import { CareerPathDisplay } from '@/components/skills-navigator/CareerPathDisplay';
-import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
+import type { CareerPathInput, CareerPathOutput } from '@/ai/flows/career-path-generator';
+import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
+import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, Navigation, Github, ShieldCheck, Sparkles, AlertTriangle } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function CareerPathPage() {
-  const [careerPathData, setCareerPathData] = useState<CareerPathOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reportType, setReportType] = useState<'free' | 'premium'>('free');
+  const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
+  const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
+  
+  const [isFreeReportLoading, setIsFreeReportLoading] = useState(false);
+  const [freeReportError, setFreeReportError] = useState<string | null>(null);
+  
+  const [currentReportType, setCurrentReportType] = useState<'free' | 'premium' | null>(null);
+  const { toast } = useToast();
+
+  // Action state for premium report generation
+  const initialPremiumState: PremiumFormActionState = { message: null, success: false, data: null, reportType: 'premium' };
+  const [premiumState, premiumFormAction, isPremiumGenerating] = useActionState(generatePremiumReportAction, initialPremiumState);
 
 
   useEffect(() => {
     document.title = 'Career Path Generator | Lume';
   }, []);
 
-  const handleFormSubmitSuccess = (data: CareerPathOutput, type: 'free' | 'premium') => {
-    setCareerPathData(data);
-    setReportType(type);
-    setError(null);
-    setIsLoading(false);
+  const handleFreeFormSubmitSuccess = (data: CareerPathOutput, originalInput: CareerPathInput, type: 'free' | 'premium') => {
+    setCurrentReportData(data);
+    setOriginalFormInput(originalInput);
+    setCurrentReportType(type as 'free'); // Initially it's always free
+    setFreeReportError(null);
+    setIsFreeReportLoading(false);
   };
 
-  const handleFormSubmitError = (errorMessage: string) => {
-    setError(errorMessage);
-    setCareerPathData(null); // Clear any previous successful data
-    setIsLoading(false); // Ensure loading is stopped
+  const handleFreeFormSubmitError = (errorMessage: string) => {
+    setFreeReportError(errorMessage);
+    setCurrentReportData(null);
+    setOriginalFormInput(null);
+    setIsFreeReportLoading(false);
+  };
+
+  // Effect to handle premium report generation result
+  useEffect(() => {
+    if (premiumState?.message) {
+      if (premiumState.success && premiumState.data) {
+        setCurrentReportData(premiumState.data as PremiumCareerPathOutput);
+        setCurrentReportType('premium');
+        toast({
+          title: 'Premium Report Generated!',
+          description: premiumState.message,
+        });
+      } else if (!premiumState.success) {
+        toast({
+          title: 'Premium Generation Failed',
+          description: premiumState.message || "Could not generate premium report.",
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [premiumState, toast]);
+
+
+  const handleUpgradeToPremiumRequest = () => {
+    if (originalFormInput) {
+      console.log("Requesting premium report with input:", originalFormInput);
+      premiumFormAction(originalFormInput);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Original form data is missing. Cannot generate premium report.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleReset = () => {
-    setCareerPathData(null);
-    setError(null);
-    setIsLoading(false);
+    setCurrentReportData(null);
+    setOriginalFormInput(null);
+    setFreeReportError(null);
+    setIsFreeReportLoading(false);
+    setCurrentReportType(null);
+    // Reset premium state if needed, though useActionState handles its own reset cycle.
   };
+
+  const isLoading = isFreeReportLoading || isPremiumGenerating;
+  const error = freeReportError || (!premiumState?.success && premiumState?.message ? premiumState.message : null);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -65,12 +119,12 @@ export default function CareerPathPage() {
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        {!careerPathData && !isLoading && !error && (
+        {!currentReportData && !isLoading && !error && (
           <section id="input-form" className="mb-12 flex flex-col items-center">
             <CareerForm 
-              onFormSubmitSuccess={handleFormSubmitSuccess}
-              onFormSubmitError={handleFormSubmitError}
-              setIsLoading={setIsLoading}
+              onFormSubmitSuccess={handleFreeFormSubmitSuccess}
+              onFormSubmitError={handleFreeFormSubmitError}
+              setIsLoading={setIsFreeReportLoading}
             />
           </section>
         )}
@@ -78,7 +132,9 @@ export default function CareerPathPage() {
         {isLoading && (
           <div className="flex flex-col items-center justify-center text-center p-10 rounded-lg shadow-lg bg-card max-w-md mx-auto">
             <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
-            <p className="text-xl font-semibold text-primary">Generating your personalized career path...</p>
+            <p className="text-xl font-semibold text-primary">
+              {isPremiumGenerating ? "Generating your premium career path..." : "Generating your personalized career path..."}
+            </p>
             <p className="text-muted-foreground mt-2">This might take a few moments. Please wait.</p>
           </div>
         )}
@@ -94,9 +150,14 @@ export default function CareerPathPage() {
           </div>
         )}
 
-        {careerPathData && !isLoading && !error && (
+        {currentReportData && currentReportType && !isLoading && !error && (
           <section id="results-display" className="max-w-3xl mx-auto">
-            <CareerPathDisplay data={careerPathData} reportType={reportType} />
+            <CareerPathDisplay 
+              data={currentReportData} 
+              reportType={currentReportType}
+              onUpgradeToPremium={handleUpgradeToPremiumRequest}
+              isPremiumLoading={isPremiumGenerating}
+            />
             <div className="mt-8 text-center">
               <Button onClick={handleReset} variant="outline" size="lg">
                 Generate Another Path
@@ -112,3 +173,5 @@ export default function CareerPathPage() {
     </div>
   );
 }
+
+    

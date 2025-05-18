@@ -10,12 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { submitCareerFormAction, type FormState } from '@/app/actions';
-import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
+import type { CareerPathOutput, CareerPathInput } from '@/ai/flows/career-path-generator';
 import { Loader2, GraduationCap, Target, AlertTriangle, Sparkles, User, Mail, Building, Briefcase, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CareerFormProps {
-  onFormSubmitSuccess: (data: CareerPathOutput, reportType: 'free' | 'premium') => void;
+  onFormSubmitSuccess: (data: CareerPathOutput, originalInput: CareerPathInput, reportType: 'free' | 'premium') => void;
   onFormSubmitError?: (message: string) => void;
   setIsLoading: (loading: boolean) => void;
 }
@@ -39,12 +39,16 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
 
+  // Store form data to pass as originalInput
+  const [formDataCache, setFormDataCache] = React.useState<CareerPathInput | null>(null);
+
   useEffect(() => {
-    setIsLoading(false);
+    setIsLoading(false); // Reset loading state whenever 'state' changes (i.e., after action completes)
 
     if (state?.message) {
-      if (state.success && state.data) {
-        onFormSubmitSuccess(state.data, state.reportType || 'free');
+      if (state.success && state.data && state.reportType === 'free' && formDataCache) {
+        // Ensure data is CareerPathOutput for free reports
+        onFormSubmitSuccess(state.data as CareerPathOutput, formDataCache, state.reportType);
         toast({
           title: 'Success!',
           description: state.message,
@@ -61,10 +65,21 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
         }
       }
     }
-  }, [state, onFormSubmitSuccess, onFormSubmitError, toast, setIsLoading]);
+  }, [state, onFormSubmitSuccess, onFormSubmitError, toast, setIsLoading, formDataCache]);
 
   const handleFormAction = (formData: FormData) => {
     setIsLoading(true);
+    // Cache the form data to be used as originalInput on success
+    const currentInput: CareerPathInput = {
+        fullName: formData.get('fullName') as string,
+        email: formData.get('email') as string,
+        university: formData.get('university') as string,
+        fieldOfStudy: formData.get('fieldOfStudy') as string,
+        currentSkills: formData.get('currentSkills') as string || undefined,
+        desiredCareerPath: formData.get('desiredCareerPath') as string || undefined,
+        learningPreference: formData.get('learningPreference') as string,
+    };
+    setFormDataCache(currentInput);
     formAction(formData);
   };
 
@@ -157,3 +172,5 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
     </Card>
   );
 }
+
+    
