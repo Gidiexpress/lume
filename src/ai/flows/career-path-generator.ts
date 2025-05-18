@@ -20,7 +20,7 @@ const CareerPathInputSchema = z.object({
   currentSkills: z.string().optional().describe("The user's current skills."),
   desiredCareerPath: z.string().optional().describe("The user's desired career path."),
   learningPreference: z.string().describe("The user's preferred learning style (e.g., Online, Hybrid, In-person)."),
-  // careerInterests: z.string().optional().describe('The user\'s career interests.'), // Replaced by desiredCareerPath and other fields
+  additionalContext: z.string().optional().describe("Any additional context or specific questions the user has."),
 });
 export type CareerPathInput = z.infer<typeof CareerPathInputSchema>;
 
@@ -36,8 +36,6 @@ const CareerPathOutputSchema = z.object({
 export type CareerPathOutput = z.infer<typeof CareerPathOutputSchema>;
 
 export async function generateCareerPath(input: CareerPathInput): Promise<CareerPathOutput> {
-  // TODO: In the future, differentiate between free and premium report generation.
-  // For premium, a different prompt and possibly a different model/configuration would be used.
   return generateFreeReportFlow(input);
 }
 
@@ -55,6 +53,7 @@ User Details:
 {{#if currentSkills}}- Current Skills: {{{currentSkills}}}{{/if}}
 {{#if desiredCareerPath}}- Desired Career Path: {{{desiredCareerPath}}}{{/if}}
 - Learning Preference: {{{learningPreference}}}
+{{#if additionalContext}}- Additional Context: {{{additionalContext}}}{{/if}}
 
 Based on their field of study primarily, provide a concise summary (2-3 paragraphs total for the entire output combined).
 Focus on:
@@ -96,10 +95,7 @@ const generateFreeReportFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await freeReportPrompt(input);
-    // For a free report, we might want to ensure the output is concise.
-    // The schema description guides the LLM, but additional processing could happen here if needed.
     return output!;
   }
 );
-
     

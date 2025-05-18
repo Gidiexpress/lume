@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { generateCareerPath, type CareerPathInput, type CareerPathOutput } from '@/ai/flows/career-path-generator';
-import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator'; // Import premium generator
+import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
 
 const CareerFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -13,10 +13,12 @@ const CareerFormSchema = z.object({
   currentSkills: z.string().optional(),
   desiredCareerPath: z.string().optional(),
   learningPreference: z.string().min(3, { message: "Learning preference must be at least 3 characters." }),
+  additionalContext: z.string().optional(),
   reportType: z.enum(['free', 'premium'], { message: "Invalid report type selected." }),
 });
 
 // This input schema is used by generatePremiumReportAction when it receives direct object input
+// It should mirror CareerPathInput which is used by generatePremiumCareerPath
 const PremiumReportInputSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -25,6 +27,7 @@ const PremiumReportInputSchema = z.object({
   currentSkills: z.string().optional(),
   desiredCareerPath: z.string().optional(),
   learningPreference: z.string().min(3, { message: "Learning preference must be at least 3 characters." }),
+  additionalContext: z.string().optional(),
 });
 
 
@@ -50,6 +53,7 @@ export async function submitCareerFormAction(
     currentSkills: formData.get('currentSkills'),
     desiredCareerPath: formData.get('desiredCareerPath'),
     learningPreference: formData.get('learningPreference'),
+    additionalContext: formData.get('additionalContext'),
     reportType: 'free', // Hardcode to free as this form is for free reports
   });
 
@@ -73,6 +77,7 @@ export async function submitCareerFormAction(
     currentSkills: careerInputs.currentSkills || undefined,
     desiredCareerPath: careerInputs.desiredCareerPath || undefined,
     learningPreference: careerInputs.learningPreference,
+    additionalContext: careerInputs.additionalContext || undefined,
   };
 
   try {
@@ -95,10 +100,8 @@ export async function submitCareerFormAction(
 
 export async function generatePremiumReportAction(
   prevState: FormState | undefined,
-  inputData: CareerPathInput // Accepts CareerPathInput directly
+  inputData: CareerPathInput // Accepts CareerPathInput directly (which now includes additionalContext)
 ): Promise<FormState> {
-  // Validate the inputData using the schema for premium report input
-  // This ensures the data structure is correct before passing to the AI flow
   const validatedFields = PremiumReportInputSchema.safeParse(inputData);
 
   if (!validatedFields.success) {
@@ -111,9 +114,7 @@ export async function generatePremiumReportAction(
     };
   }
 
-  // Simulate payment check
   console.log("Premium report requested for:", validatedFields.data.email, "- Simulating payment verification...");
-  // In a real app, integrate payment gateway here. For now, we assume payment is successful.
   const paymentSuccessful = true; 
 
   if (!paymentSuccessful) {
@@ -127,8 +128,8 @@ export async function generatePremiumReportAction(
   console.log("Payment successful (simulated). Generating premium report...");
 
   try {
-    // Pass validated data to the premium career path generator
-    const premiumCareerPath = await generatePremiumCareerPath(validatedFields.data);
+    // Pass validated data (which is of type CareerPathInput) to the premium career path generator
+    const premiumCareerPath = await generatePremiumCareerPath(validatedFields.data as CareerPathInput);
     return {
       message: 'Premium career path generated successfully!',
       data: premiumCareerPath,
@@ -137,7 +138,6 @@ export async function generatePremiumReportAction(
     };
   } catch (error) {
     console.error("Error generating premium career path:", error);
-    // Check if error is an object and has a message property
     let errorMessage = "Failed to generate premium career path. Please try again later.";
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -192,5 +192,4 @@ export async function emailResultsAction(
     success: true,
   };
 }
-
     

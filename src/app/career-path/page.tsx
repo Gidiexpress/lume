@@ -8,7 +8,7 @@ import type { CareerPathInput, CareerPathOutput } from '@/ai/flows/career-path-g
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
 import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, Navigation, Github, ShieldCheck, Sparkles, AlertTriangle } from 'lucide-react';
+import { Loader2, Navigation, Github, ShieldCheck, Sparkles, AlertTriangle, MessageSquarePlus } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function CareerPathPage() {
   const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
+  // originalFormInput now matches CareerPathInput which includes additionalContext
   const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
   
   const [isFreeReportLoading, setIsFreeReportLoading] = useState(false);
@@ -24,7 +25,6 @@ export default function CareerPathPage() {
   const [currentReportType, setCurrentReportType] = useState<'free' | 'premium' | null>(null);
   const { toast } = useToast();
 
-  // Action state for premium report generation
   const initialPremiumState: PremiumFormActionState = { message: null, success: false, data: null, reportType: 'premium' };
   const [premiumState, premiumFormAction, isPremiumGenerating] = useActionState(generatePremiumReportAction, initialPremiumState);
 
@@ -35,8 +35,8 @@ export default function CareerPathPage() {
 
   const handleFreeFormSubmitSuccess = (data: CareerPathOutput, originalInput: CareerPathInput, type: 'free' | 'premium') => {
     setCurrentReportData(data);
-    setOriginalFormInput(originalInput);
-    setCurrentReportType(type as 'free'); // Initially it's always free
+    setOriginalFormInput(originalInput); // originalInput now contains additionalContext
+    setCurrentReportType(type as 'free');
     setFreeReportError(null);
     setIsFreeReportLoading(false);
   };
@@ -45,10 +45,9 @@ export default function CareerPathPage() {
     setFreeReportError(errorMessage);
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    setIsFreeReportLoading(false);
+    setIsFreeReportLoading(false); // Ensure loading is stopped on error
   };
 
-  // Effect to handle premium report generation result
   useEffect(() => {
     if (premiumState?.message) {
       if (premiumState.success && premiumState.data) {
@@ -72,6 +71,7 @@ export default function CareerPathPage() {
   const handleUpgradeToPremiumRequest = () => {
     if (originalFormInput) {
       console.log("Requesting premium report with input:", originalFormInput);
+      // The originalFormInput is already of type CareerPathInput, which generatePremiumReportAction expects
       premiumFormAction(originalFormInput);
     } else {
       toast({
@@ -88,7 +88,6 @@ export default function CareerPathPage() {
     setFreeReportError(null);
     setIsFreeReportLoading(false);
     setCurrentReportType(null);
-    // Reset premium state if needed, though useActionState handles its own reset cycle.
   };
 
   const isLoading = isFreeReportLoading || isPremiumGenerating;
@@ -173,5 +172,4 @@ export default function CareerPathPage() {
     </div>
   );
 }
-
     

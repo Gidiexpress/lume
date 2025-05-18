@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { submitCareerFormAction, type FormState } from '@/app/actions';
 import type { CareerPathOutput, CareerPathInput } from '@/ai/flows/career-path-generator';
-import { Loader2, GraduationCap, Target, AlertTriangle, Sparkles, User, Mail, Building, Briefcase, BookOpen } from 'lucide-react';
+import { Loader2, GraduationCap, Target, AlertTriangle, Sparkles, User, Mail, Building, Briefcase, BookOpen, MessageSquarePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CareerFormProps {
@@ -39,15 +39,13 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
 
-  // Store form data to pass as originalInput
   const [formDataCache, setFormDataCache] = React.useState<CareerPathInput | null>(null);
 
   useEffect(() => {
-    setIsLoading(false); // Reset loading state whenever 'state' changes (i.e., after action completes)
+    setIsLoading(false); 
 
     if (state?.message) {
       if (state.success && state.data && state.reportType === 'free' && formDataCache) {
-        // Ensure data is CareerPathOutput for free reports
         onFormSubmitSuccess(state.data as CareerPathOutput, formDataCache, state.reportType);
         toast({
           title: 'Success!',
@@ -69,7 +67,6 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
 
   const handleFormAction = (formData: FormData) => {
     setIsLoading(true);
-    // Cache the form data to be used as originalInput on success
     const currentInput: CareerPathInput = {
         fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
@@ -78,6 +75,7 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
         currentSkills: formData.get('currentSkills') as string || undefined,
         desiredCareerPath: formData.get('desiredCareerPath') as string || undefined,
         learningPreference: formData.get('learningPreference') as string,
+        additionalContext: formData.get('additionalContext') as string || undefined,
     };
     setFormDataCache(currentInput);
     formAction(formData);
@@ -156,10 +154,17 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="additionalContext" className="flex items-center text-md">
+              <MessageSquarePlus className="mr-2 h-5 w-5 text-primary" />
+              Additional Context (Optional)
+            </Label>
+            <Textarea id="additionalContext" name="additionalContext" placeholder="e.g., Specific questions, concerns, or areas you want the report to focus on." rows={3} className="text-base" />
+          </div>
+
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-4">
           <SubmitButton />
-          {/* Hidden input to ensure reportType is always 'free' from this form */}
           <input type="hidden" name="reportType" value="free" />
           {state?.message && !state.success && (
             <p className="text-sm text-destructive flex items-center mt-4 p-3 bg-destructive/10 rounded-md border border-destructive/30">
@@ -172,5 +177,4 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
     </Card>
   );
 }
-
     

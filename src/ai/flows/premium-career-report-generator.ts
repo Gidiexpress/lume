@@ -4,171 +4,201 @@
  * @fileOverview Generates a detailed premium career path report.
  *
  * - generatePremiumCareerPath - A function that generates the premium career path.
- * - PremiumCareerPathInput - The input type (same as CareerPathInput).
+ * - PremiumCareerPathInput - The input type (maps from app's CareerPathInput).
  * - PremiumCareerPathOutput - The return type for the premium career path function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { CareerPathInput } from './career-path-generator'; // Re-using the input type
+// Use the app-standard input type for the exported function
+import type { CareerPathInput as AppStandardCareerPathInput } from './career-path-generator';
 
-// Define the detailed output schema for the Premium Report
+// Define the prompt-specific input schema based on Handlebars variables in the new prompt
+const PremiumPromptInputSchema = z.object({
+  name: z.string().describe("The user's full name."),
+  user_field: z.string().describe("The user's field of study."),
+  career_path: z.string().describe("The user's desired career path."),
+  skills: z.string().optional().describe("The user's current skills (if provided)."),
+  learning_mode: z.string().describe("The user's preferred learning mode (e.g., online, self-paced, hybrid)."),
+  additionalContext: z.string().optional().describe("Additional context or questions from the user (if any)."),
+});
+export type PremiumPromptInput = z.infer<typeof PremiumPromptInputSchema>;
+
+
+// Define the detailed output schema for the Premium Report based on the new prompt
 const PremiumCareerPathOutputSchema = z.object({
-  jobRoles: z.array(z.string()).describe('A list of 3-5 relevant job roles based on field of study, with brief descriptions for each.'),
-  technicalSkillsToDevelop: z.array(z.string()).describe('A comprehensive list of technical skills to master, categorized by importance (e.g., foundational, advanced).'),
-  softSkillsToBuild: z.array(z.string()).describe('A detailed list of essential soft skills, with examples of how to develop them.'),
-  toolsAndSoftware: z.array(z.string()).describe('An extensive list of common tools, software, and platforms used in these roles.'),
-  
-  careerSummary: z.string().describe("An in-depth summary of the chosen career path, including long-term outlook and potential specializations."),
+  careerRoleSummary: z.object({
+    roleTitle: z.string().describe("The specific career role being summarized."),
+    explanation: z.string().describe("Practical explanation of the role, tailored for someone new."),
+    typicalResponsibilities: z.array(z.string()).describe("List of typical responsibilities and day-to-day tasks."),
+    specializations: z.array(z.object({
+      name: z.string().describe("Name of the specialization within the role."),
+      description: z.string().describe("Brief description of the specialization.")
+    })).optional().describe("Breakdown of career specializations within the role (e.g., frontend vs backend).")
+  }).describe("Section 1: Career Role Summary"),
+
   careerRoadmap: z.array(z.object({
-    stage: z.string().describe("e.g., Beginner (0-1 year), Intermediate (1-3 years), Advanced (3+ years)"),
-    focus: z.string().describe("Main goals and focus areas for this stage."),
-    skillsToLearn: z.array(z.string()).describe("Specific skills to acquire or hone during this stage."),
+    stageName: z.string().describe("Name of the stage, e.g., Beginner (0-3 months), Intermediate (3-12 months), Pro-level (1-2 years)."),
+    duration: z.string().describe("Typical duration for this stage."),
+    focusAreas: z.array(z.string()).describe("Main goals and focus areas for this stage."),
+    skillsToDevelop: z.array(z.string()).describe("Specific skills to acquire or hone during this stage."),
     projectExamples: z.array(z.string()).describe("Example projects suitable for this stage."),
-    milestones: z.array(z.string()).describe("Key milestones to achieve.")
-  })).describe("A step-by-step roadmap from beginner to professional level."),
-  
-  skillGapAnalysis: z.object({
-    identifiedCurrentSkills: z.array(z.string()).optional().describe("Skills identified from user's input or inferred."),
-    essentialSkillsForPath: z.array(z.string()).describe("Essential skills required for the desired career path."),
-    skillsToBridge: z.array(z.string()).describe("Specific skills the user needs to develop to bridge the gap.")
-  }).describe("Analysis of the user's current skills against required skills for the path."),
-  
+    typicalJobTitles: z.array(z.string()).optional().describe("Typical job titles at this stage and progression notes."),
+    keyMilestones: z.array(z.string()).describe("Key milestones to achieve.")
+  })).describe("Section 2: Career Roadmap from beginner to professional."),
+
+  skillGapAssessment: z.object({
+    probableExistingSkills: z.array(z.string()).describe("Skills the user likely already possesses based on their field of study, including soft skills."),
+    criticalSkillsToLearn: z.array(z.string()).describe("Critical skills the user needs to learn for the desired career path."),
+    skillReadinessScore: z.number().min(0).max(100).describe("A simple Skill Readiness Score out of 100."),
+    readinessExplanation: z.string().describe("A short explanation for the Skill Readiness Score.")
+  }).describe("Section 3: Skill Gap Assessment"),
+
   learningResources: z.array(z.object({
-    category: z.string().describe("e.g., Foundational Concepts, Programming Languages, Tools & Platforms, Specializations"),
-    resources: z.array(z.object({
-      title: z.string().describe("Name of the course, book, or resource."),
-      type: z.enum(['Course', 'Book', 'Website', 'Community', 'Video Series', 'Tutorial', 'Documentation', 'Other']).describe("Type of resource."),
-      urlSuggestion: z.string().optional().describe("A suggested platform or search term (e.g., Coursera, Udemy, YouTube channel, specific documentation site). AI should not invent full URLs."),
-      isFree: z.boolean().describe("Whether the resource is typically free or paid.")
-    }))
-  })).describe("Curated list of learning resources, categorized and indicating if free or paid. Include a mix of types."),
-  
+    title: z.string().describe("Course Title."),
+    platform: z.string().describe("Platform (e.g., Coursera, ALX, Udemy, YouTube, Sololearn)."),
+    urlSuggestion: z.string().describe("A URL or a search term for finding the resource. AI should prioritize official/main platform URLs if possible but not invent full course URLs unless easily verifiable and public."),
+    isFree: z.boolean().optional().describe("Whether the resource is typically free or paid.")
+  })).min(5).describe("Section 4: List of at least 5 hand-picked, high-quality learning resources. URLs should be for the platform or main course page if known, not deep affiliate links."),
+
   recommendedCertifications: z.array(z.object({
     name: z.string().describe("Name of the certification."),
-    issuingBody: z.string().describe("e.g., Google, AWS, CompTIA, Microsoft, Cisco"),
-    relevance: z.string().describe("Why this certification is relevant for the career path.")
-  })).describe("Industry-recognized certifications relevant to the career path."),
-  
-  sampleProjectsDetailed: z.array(z.object({
-    title: z.string().describe("Title of the project."),
-    description: z.string().describe("A brief overview of the project and its objectives."),
-    learningOutcomes: z.array(z.string()).describe("What the user will learn by completing it."),
-    difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']).describe("Project difficulty level.")
-  })).describe("More detailed sample project ideas with learning outcomes and difficulty."),
-  
-  resumeTips: z.array(z.string()).describe("Actionable tips for tailoring a resume to this career path, including keywords, sections to emphasize, and achievements to highlight."),
-  
+    issuingBody: z.string().describe("e.g., Google, AWS, CompTIA, Microsoft, Cisco."),
+    estimatedCost: z.string().optional().describe("Cost estimate (e.g., $100-$200, Free, Varies)."),
+    hiringBenefit: z.string().describe("How this certification helps the user get hired.")
+  })).min(3).describe("Section 5: At least 3 relevant certifications with cost and benefits."),
+
+  toolsAndSoftware: z.object({
+    beginner: z.array(z.string()).describe("Essential tools for beginners."),
+    intermediate: z.array(z.string()).describe("Tools for intermediate users."),
+    advanced: z.array(z.string()).describe("Advanced tools for professionals.")
+  }).describe("Section 6: Essential tools or software, grouped by level."),
+
+  sampleProjects: z.array(z.object({
+    title: z.string().describe("Title of the project idea."),
+    problemStatement: z.string().describe("A short one-line problem statement for the project."),
+    learningOutcomes: z.array(z.string()).optional().describe("What the user will learn."),
+    difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']).optional().describe("Project difficulty.")
+  })).min(2).max(3).describe("Section 7: 2-3 simple, real-world project ideas with problem statements."),
+
+  softSkills: z.array(z.object({
+    skillName: z.string().describe("Name of the key soft skill."),
+    importance: z.string().optional().describe("Why this soft skill is important for the role."),
+    improvementSuggestion: z.string().describe("How the user can improve this soft skill (e.g., volunteer, clubs).")
+  })).describe("Section 8: Key soft skills needed and how to improve them."),
+
   jobMarketInsight: z.object({
-    localNigeria: z.string().describe("Insights into the Nigerian job market for this career path, including demand trends, typical salary ranges (if available and general), key industries/employers, and networking tips specific to Nigeria."),
-    remoteGlobal: z.string().describe("Insights into remote/global job opportunities, including popular platforms for finding remote roles, skills highly valued by international employers, and tips for working effectively in a remote setup.")
-  }).describe("Overview of job market conditions, both locally in Nigeria and for remote opportunities worldwide."),
+    entryLevelSalaryNigeria: z.string().describe("Entry-level salary range in Nigeria (e.g., N150,000 - N300,000 monthly)."),
+    globalRemoteOutlook: z.string().describe("Outlook on global remote job availability for this role."),
+    remoteWorkPopularity: z.string().describe("Comment on whether remote work is possible or popular in this field.")
+  }).describe("Section 9: Job Market Insight with salary, remote work info."),
+
+  resumeWritingTips: z.object({
+    tips: z.array(z.string().describe("Specific resume optimization tip for this role.")).min(3).describe("At least 3 resume optimization tips."),
+    hiringManagerFocus: z.string().describe("What hiring managers look for in freshers for this role.")
+  }).describe("Section 10: Resume writing tips and what hiring managers look for.")
 });
 export type PremiumCareerPathOutput = z.infer<typeof PremiumCareerPathOutputSchema>;
 
 
-// Re-using CareerPathInputSchema from the free report generator
-const CareerPathInputSchema = z.object({
-  fullName: z.string().describe("The user's full name."),
-  email: z.string().email().describe("The user's email address."),
-  university: z.string().describe("The user's university or institution."),
-  fieldOfStudy: z.string().describe("The user's field of study."),
-  currentSkills: z.string().optional().describe("The user's current skills. This is crucial for skill gap analysis."),
-  desiredCareerPath: z.string().optional().describe("The user's desired career path. This heavily influences the report."),
-  learningPreference: z.string().describe("The user's preferred learning style (e.g., Online, Hybrid, In-person)."),
-});
-export type PremiumCareerPathInput = z.infer<typeof CareerPathInputSchema>;
-
-
-export async function generatePremiumCareerPath(input: PremiumCareerPathInput): Promise<PremiumCareerPathOutput> {
-  return premiumReportFlow(input);
+export async function generatePremiumCareerPath(appInput: AppStandardCareerPathInput): Promise<PremiumCareerPathOutput> {
+  // Map the application-standard input to the prompt-specific input
+  const promptInput: PremiumPromptInput = {
+    name: appInput.fullName,
+    user_field: appInput.fieldOfStudy,
+    career_path: appInput.desiredCareerPath || "Not specified by user", // Provide a default if empty
+    skills: appInput.currentSkills || undefined, // Pass as undefined if empty, as schema expects optional string
+    learning_mode: appInput.learningPreference,
+    additionalContext: appInput.additionalContext || undefined,
+  };
+  return premiumReportFlow(promptInput);
 }
 
 const premiumReportPrompt = ai.definePrompt({
-  name: 'premiumCareerPathGeneratorPrompt',
-  input: {schema: CareerPathInputSchema},
-  output: {schema: PremiumCareerPathOutputSchema},
-  prompt: `You are an expert career counselor and AI strategist, tasked with generating a comprehensive, premium career guidance report for a Nigerian student/recent graduate. This report should be highly detailed, actionable, and tailored to their profile.
+  name: 'premiumCareerGuidancePrompt',
+  input: {schema: PremiumPromptInputSchema}, // Use the prompt-specific input schema
+  output: {schema: PremiumCareerPathOutputSchema}, // Use the new detailed output schema
+  prompt: `You are a career development expert helping university students and recent graduates in Nigeria transition into job-ready professionals.
 
-User Details:
-- Full Name: {{{fullName}}}
-- Email: {{{email}}}
-- University: {{{university}}}
-- Field of Study: {{{fieldOfStudy}}}
-{{#if currentSkills}}- Current Skills: {{{currentSkills}}} (Use this for skill gap analysis. If empty, note that skill gap analysis will be more general.){{/if}}
-{{#if desiredCareerPath}}- Desired Career Path: {{{desiredCareerPath}}} (This is the primary focus. If empty, suggest paths based on fieldOfStudy and provide the report for the most prominent one.){{/if}}
-- Learning Preference: {{{learningPreference}}}
+The user has already selected a desired career path and shared their academic background. Your job is to generate a premium-quality career guidance report that includes:
 
-GENERATE A PREMIUM REPORT WITH THE FOLLOWING SECTIONS. BE THOROUGH AND PROVIDE SUBSTANTIAL CONTENT FOR EACH:
+---
 
-1.  **Job Roles (3-5 roles):**
-    *   List relevant job roles based on their field of study and desired career path.
-    *   For each role, provide a brief description (2-3 sentences).
+1.  **Career Role Summary**
+    *   A practical explanation of the selected role, tailored for someone new.
+    *   Explain typical responsibilities and day-to-day tasks.
+    *   Break down career specializations within the role (e.g., frontend vs backend for developers).
 
-2.  **Technical Skills to Develop:**
-    *   Provide a comprehensive list of technical skills.
-    *   Categorize them: Foundational, Intermediate, Advanced.
-    *   Briefly explain why each skill is important.
+2.  **Career Roadmap**
+    *   Break down a realistic roadmap from beginner to professional in 3 stages:
+        *   Beginner (0–3 months)
+        *   Intermediate (3–12 months)
+        *   Pro-level (1–2 years)
+    *   Mention typical job titles and progression for each stage.
+    *   Include focus areas, skills to develop, project examples, and key milestones for each stage.
 
-3.  **Soft Skills to Build:**
-    *   List essential soft skills (e.g., communication, problem-solving, teamwork, adaptability, critical thinking).
-    *   For each, provide 1-2 examples of how to develop or demonstrate it.
+3.  **Skill Gap Assessment**
+    *   Based on the user’s background (field of study: {{user_field}}, current skills: {{skills}}), list:
+        *   Probable existing skills they likely already have (even soft skills from their field of study).
+        *   Critical skills they need to learn for the desired career path: {{career_path}}.
+    *   Assign a simple “Skill Readiness Score” out of 100 with a short explanation, considering their background for {{career_path}}.
 
-4.  **Tools and Software:**
-    *   List common tools, software, and platforms relevant to the suggested job roles.
-    *   Include a mix of industry-standard and emerging tools.
+4.  **Learning Resources**
+    *   List at least 5 hand-picked, high-quality courses (free or paid).
+    *   For each, provide: Title, Platform (e.g., Coursera, ALX, Udemy, YouTube, Sololearn), and a URL suggestion (main platform URL or direct course page if publicly known and stable. DO NOT invent full deep course URLs or affiliate links). Indicate if free or paid.
+    *   Example Format: Title: Introduction to Python, Platform: Coursera, UrlSuggestion: https://www.coursera.org, IsFree: false (or true)
 
-5.  **Career Summary:**
-    *   An in-depth summary (2-3 paragraphs) of the chosen/suggested career path.
-    *   Discuss long-term outlook, potential specializations, and growth opportunities in Nigeria and globally.
+5.  **Certifications**
+    *   Recommend at least 3 relevant certifications for {{career_path}}.
+    *   For each, include: Name, Issuing Body, Estimated Cost (e.g., "$100", "Varies", "Free"), and a brief explanation of how it helps the user get hired.
 
-6.  **Career Roadmap (Beginner to Pro):**
-    *   Create a multi-stage roadmap (e.g., Beginner: 0-1 yr, Intermediate: 1-3 yrs, Advanced: 3+ yrs).
-    *   For each stage:
-        *   **Focus:** Main goals and learning objectives.
-        *   **SkillsToLearn:** Specific skills to acquire or hone.
-        *   **ProjectExamples:** Types of projects to undertake.
-        *   **Milestones:** Key achievements or milestones for that stage.
+6.  **Tools & Software**
+    *   List essential tools or software used in the role of {{career_path}}.
+    *   Group them as beginner, intermediate, and advanced.
 
-7.  **Skill Gap Analysis:**
-    *   **IdentifiedCurrentSkills:** List skills from user input or infer based on field of study if not provided.
-    *   **EssentialSkillsForPath:** List key skills needed for the target career path.
-    *   **SkillsToBridge:** Highlight the specific skills the user should focus on developing.
-    *   If no current skills are provided, state that the analysis is general.
+7.  **Sample Projects**
+    *   Suggest 2–3 simple, real-world project ideas relevant to {{career_path}}.
+    *   Include a short one-line problem statement for each project.
+    *   Optionally list learning outcomes and difficulty.
 
-8.  **Learning Resources:**
-    *   Provide a categorized list of learning resources (e.g., Foundational Concepts, Programming, Tools, Specializations).
-    *   For each category, list 3-5 resources.
-    *   For each resource:
-        *   **Title:** Name of the course, book, platform, etc.
-        *   **Type:** (Course, Book, Website, Community, Video Series, Tutorial, Documentation, Other).
-        *   **UrlSuggestion:** Suggest a platform (e.g., Coursera, Udemy, freeCodeCamp, official documentation site) or search terms. DO NOT invent full URLs.
-        *   **IsFree:** Indicate if typically free or paid.
-    *   Ensure a mix of resource types and include resources relevant to the Nigerian context if possible (e.g., local communities).
+8.  **Soft Skills**
+    *   Highlight key soft skills needed for success in {{career_path}}.
+    *   For each skill, suggest how the user can improve them (e.g., volunteer, join clubs, online workshops).
 
-9.  **Recommended Certifications:**
-    *   List 2-4 industry-recognized certifications.
-    *   For each: Name, IssuingBody, and Relevance to the career path.
+9.  **Job Market Insight for {{career_path}}**
+    *   Provide a quick outlook on job opportunities:
+        *   Entry-level salary range in Nigeria (e.g., "N150,000 - N300,000 per month").
+        *   Global remote job availability (e.g., "High", "Moderate", "Low with opportunities on specific platforms").
+        *   Mention if remote work is generally possible or popular in this field.
 
-10. **Sample Projects (Detailed):**
-    *   Provide 2-3 detailed sample project ideas.
-    *   For each: Title, Description (what it involves), LearningOutcomes, Difficulty (Beginner, Intermediate, Advanced).
+10. **Resume Writing Tips for {{career_path}}**
+    *   Give at least 3 resume optimization tips tailored for this role.
+    *   Highlight what hiring managers in Nigeria typically look for in freshers applying for {{career_path}}.
 
-11. **Resume Tips:**
-    *   Provide 5-7 actionable tips for tailoring their resume.
-    *   Include advice on keywords, structuring the resume, highlighting projects, and quantifying achievements, especially for entry-level candidates.
+---
 
-12. **Job Market Insight:**
-    *   **LocalNigeria:** Discuss demand in Nigeria, typical salary expectations (general ranges if possible, e.g., "entry-level roles in Lagos might range from X to Y Naira monthly"), key industries/employers, and Nigerian-specific job boards or networking avenues.
-    *   **RemoteGlobal:** Discuss remote opportunities, skills valued globally, platforms for remote jobs (e.g., LinkedIn, Upwork, We Work Remotely), and tips for succeeding in a remote role.
+🔒 The tone should be:
+- Friendly, encouraging, and professional.
+- Use bullet points, short paragraphs, and clear headers for readability.
+- Avoid jargon. Assume the reader is a student or young graduate unfamiliar with the corporate world.
 
-VERY IMPORTANT: Ensure all fields in the output schema are populated with rich, detailed, and practical information. The user is paying for this report, so it must be comprehensive and valuable.
-If 'desiredCareerPath' is not specified, select the most suitable one based on 'fieldOfStudy' and generate the report for that.
-If 'currentSkills' are not provided by the user, the 'identifiedCurrentSkills' field in 'skillGapAnalysis' can be an empty array or state that it's based on general assumptions for the field of study, and 'skillsToBridge' should then list all essential skills as needing development.
-The output should be well-structured according to the schema.
+---
+
+🧑‍🎓 USER INPUT:
+- Name: {{name}}
+- Field of Study: {{user_field}}
+- Desired Career Path: {{career_path}}
+{{#if skills}}- Current Skills: {{skills}}{{else}}- Current Skills: Not specified{{/if}}
+- Preferred Learning Mode: {{learning_mode}}
+{{#if additionalContext}}- Additional Context: {{additionalContext}}{{else}}- Additional Context: None{{/if}}
+
+Generate the complete premium career report for this user according to the schema. Ensure all fields in the output schema are populated with rich, detailed, and practical information.
+The user is paying for this report, so it must be comprehensive and valuable.
+If 'desiredCareerPath' is "Not specified by user", select the most suitable one based on 'fieldOfStudy' and generate the report for that, clearly stating the chosen path.
+If 'currentSkills' are not provided by the user, the 'probableExistingSkills' should be based on general assumptions for the field of study, and 'criticalSkillsToLearn' should then list all essential skills as needing development.
 `,
   config: {
-    safetySettings: [ // Allow for more comprehensive, potentially sensitive advice within safety limits
+    safetySettings: [
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -179,21 +209,21 @@ The output should be well-structured according to the schema.
 
 const premiumReportFlow = ai.defineFlow(
   {
-    name: 'premiumReportFlow',
-    inputSchema: CareerPathInputSchema,
+    name: 'premiumReportGenerationFlow', // Changed name to avoid conflict if old one is cached by Genkit
+    inputSchema: PremiumPromptInputSchema, // Flow's public input uses the prompt-specific schema
     outputSchema: PremiumCareerPathOutputSchema,
   },
-  async input => {
-    // Simulate payment check - in a real app, this would be a call to a payment service
-    console.log("Simulating payment verification for premium report for:", input.email);
+  async (promptInput: PremiumPromptInput) => {
+    // Simulate payment check - in a real app, this would be done before calling this flow,
+    // or the calling action would handle it.
+    console.log("Simulating payment verification for premium report for user:", promptInput.name);
     // Assume payment is successful to proceed
 
-    const {output} = await premiumReportPrompt(input);
+    const {output} = await premiumReportPrompt(promptInput);
     if (!output) {
       throw new Error("Premium report generation failed to produce output.");
     }
     return output;
   }
 );
-
     
