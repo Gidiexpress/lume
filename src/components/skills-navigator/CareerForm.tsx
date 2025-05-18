@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface CareerFormProps {
   onFormSubmitSuccess: (data: CareerPathOutput, reportType: 'free' | 'premium') => void;
+  onFormSubmitError?: (message: string) => void;
   setIsLoading: (loading: boolean) => void;
 }
 
@@ -33,17 +34,12 @@ function SubmitButton() {
   );
 }
 
-export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProps) {
+export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoading }: CareerFormProps) {
   const initialState: FormState = { message: null, success: false, data: null, reportType: 'free' };
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
-    // This effect runs when `state` (from useActionState) changes,
-    // or when onFormSubmitSuccess, toast, or setIsLoading references change.
-    // The primary trigger should be `state` changing after the action completes.
-
-    // Crucially, set loading to false once the action is done (state has updated).
     setIsLoading(false);
 
     if (state?.message) {
@@ -54,14 +50,18 @@ export function CareerForm({ onFormSubmitSuccess, setIsLoading }: CareerFormProp
           description: state.message,
         });
       } else if (!state.success) {
+        const errorMessage = state.message || 'An unexpected error occurred.';
         toast({
           title: 'Error',
-          description: state.message || 'An unexpected error occurred.',
+          description: errorMessage,
           variant: 'destructive',
         });
+        if (onFormSubmitError) {
+          onFormSubmitError(errorMessage);
+        }
       }
     }
-  }, [state, onFormSubmitSuccess, toast, setIsLoading]); // Added setIsLoading to dependency array
+  }, [state, onFormSubmitSuccess, onFormSubmitError, toast, setIsLoading]);
 
   const handleFormAction = (formData: FormData) => {
     setIsLoading(true);

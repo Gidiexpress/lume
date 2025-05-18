@@ -6,14 +6,14 @@ import { CareerForm } from '@/components/skills-navigator/CareerForm';
 import { CareerPathDisplay } from '@/components/skills-navigator/CareerPathDisplay';
 import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
 import { Button } from '@/components/ui/button';
-import { Loader2, Navigation, Github, ShieldCheck, Sparkles } from 'lucide-react';
+import { Loader2, Navigation, Github, ShieldCheck, Sparkles, AlertTriangle } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 
 export default function CareerPathPage() {
   const [careerPathData, setCareerPathData] = useState<CareerPathOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Retained for potential direct error display
+  const [error, setError] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'free' | 'premium'>('free');
 
 
@@ -25,6 +25,12 @@ export default function CareerPathPage() {
     setCareerPathData(data);
     setReportType(type);
     setError(null);
+    setIsLoading(false);
+  };
+
+  const handleFormSubmitError = (errorMessage: string) => {
+    setError(errorMessage);
+    setCareerPathData(null); // Clear any previous successful data
     setIsLoading(false); // Ensure loading is stopped
   };
 
@@ -39,7 +45,7 @@ export default function CareerPathPage() {
       <header className="py-4 px-6 shadow-md bg-card sticky top-0 z-40">
         <div className="container mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center space-x-2">
-            <Sparkles className="h-8 w-8 text-primary" /> {/* Changed icon to Sparkles to match Lume */}
+            <Sparkles className="h-8 w-8 text-primary" />
             <h1 className="text-2xl font-bold">Lume</h1>
           </Link>
           <div className="flex items-center space-x-2">
@@ -59,10 +65,11 @@ export default function CareerPathPage() {
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        {!careerPathData && !isLoading && (
+        {!careerPathData && !isLoading && !error && (
           <section id="input-form" className="mb-12 flex flex-col items-center">
             <CareerForm 
               onFormSubmitSuccess={handleFormSubmitSuccess}
+              onFormSubmitError={handleFormSubmitError}
               setIsLoading={setIsLoading}
             />
           </section>
@@ -76,16 +83,18 @@ export default function CareerPathPage() {
           </div>
         )}
 
-        {/* Error display from `state` in CareerForm is usually sufficient. This is a fallback. */}
         {error && !isLoading && ( 
-          <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto">
-            <p className="font-semibold">Error:</p>
-            <p>{error}</p>
+          <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto border border-destructive/30">
+            <div className="flex items-center justify-center mb-3">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <p className="font-semibold text-lg">Generation Failed</p>
+            </div>
+            <p className="mb-4">{error}</p>
             <Button onClick={handleReset} variant="destructive" className="mt-4">Try Again</Button>
           </div>
         )}
 
-        {careerPathData && !isLoading && (
+        {careerPathData && !isLoading && !error && (
           <section id="results-display" className="max-w-3xl mx-auto">
             <CareerPathDisplay data={careerPathData} reportType={reportType} />
             <div className="mt-8 text-center">
@@ -103,5 +112,3 @@ export default function CareerPathPage() {
     </div>
   );
 }
-
-    
