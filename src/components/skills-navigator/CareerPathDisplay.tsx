@@ -223,7 +223,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         </Button>
       </div>
       
-      {reportType === 'free' && !isPremiumLoading && (
+      {reportType === 'free' && (
         <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-primary flex items-center">
@@ -251,13 +251,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
              <p className="text-xs text-muted-foreground text-center mt-2">(Payment is simulated for this demo and will not be charged)</p>
           </CardContent>
         </Card>
-      )}
-      {isPremiumLoading && reportType === 'free' && (
-         <div className="flex flex-col items-center justify-center text-center p-10 rounded-lg shadow-lg bg-card max-w-md mx-auto">
-            <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
-            <p className="text-xl font-semibold text-primary">Crafting your Premium Report...</p>
-            <p className="text-muted-foreground mt-2">This detailed analysis takes a bit longer. Please wait.</p>
-          </div>
       )}
 
       {/* FREE REPORT DISPLAY */}
@@ -520,6 +513,3 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     </div>
   );
 }
-    
-
-    

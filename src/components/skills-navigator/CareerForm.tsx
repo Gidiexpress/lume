@@ -16,8 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface CareerFormProps {
   onFormSubmitSuccess: (data: CareerPathOutput, originalInput: CareerPathInput, reportType: 'free' | 'premium') => void;
-  onFormSubmitError?: (message: string) => void;
-  setIsLoading: (loading: boolean) => void;
+  onFormSubmitError: (message: string) => void; // Changed to non-optional
 }
 
 function SubmitButton() {
@@ -34,7 +33,7 @@ function SubmitButton() {
   );
 }
 
-export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoading }: CareerFormProps) {
+export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFormProps) {
   const initialState: FormState = { message: null, success: false, data: null, reportType: 'free' };
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
@@ -42,8 +41,6 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
   const [formDataCache, setFormDataCache] = React.useState<CareerPathInput | null>(null);
 
   useEffect(() => {
-    setIsLoading(false); 
-
     if (state?.message) {
       if (state.success && state.data && state.reportType === 'free' && formDataCache) {
         onFormSubmitSuccess(state.data as CareerPathOutput, formDataCache, state.reportType);
@@ -58,15 +55,12 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
           description: errorMessage,
           variant: 'destructive',
         });
-        if (onFormSubmitError) {
-          onFormSubmitError(errorMessage);
-        }
+        onFormSubmitError(errorMessage);
       }
     }
-  }, [state, onFormSubmitSuccess, onFormSubmitError, toast, setIsLoading, formDataCache]);
+  }, [state, onFormSubmitSuccess, onFormSubmitError, toast, formDataCache]);
 
   const handleFormAction = (formData: FormData) => {
-    setIsLoading(true);
     const currentInput: CareerPathInput = {
         fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
@@ -177,4 +171,3 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, setIsLoadin
     </Card>
   );
 }
-    

@@ -16,10 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function CareerPathPage() {
   const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
-  // originalFormInput now matches CareerPathInput which includes additionalContext
   const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
   
-  const [isFreeReportLoading, setIsFreeReportLoading] = useState(false);
   const [freeReportError, setFreeReportError] = useState<string | null>(null);
   
   const [currentReportType, setCurrentReportType] = useState<'free' | 'premium' | null>(null);
@@ -35,17 +33,15 @@ export default function CareerPathPage() {
 
   const handleFreeFormSubmitSuccess = (data: CareerPathOutput, originalInput: CareerPathInput, type: 'free' | 'premium') => {
     setCurrentReportData(data);
-    setOriginalFormInput(originalInput); // originalInput now contains additionalContext
+    setOriginalFormInput(originalInput);
     setCurrentReportType(type as 'free');
     setFreeReportError(null);
-    setIsFreeReportLoading(false);
   };
 
   const handleFreeFormSubmitError = (errorMessage: string) => {
     setFreeReportError(errorMessage);
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    setIsFreeReportLoading(false); // Ensure loading is stopped on error
   };
 
   useEffect(() => {
@@ -71,7 +67,6 @@ export default function CareerPathPage() {
   const handleUpgradeToPremiumRequest = () => {
     if (originalFormInput) {
       console.log("Requesting premium report with input:", originalFormInput);
-      // The originalFormInput is already of type CareerPathInput, which generatePremiumReportAction expects
       premiumFormAction(originalFormInput);
     } else {
       toast({
@@ -86,11 +81,10 @@ export default function CareerPathPage() {
     setCurrentReportData(null);
     setOriginalFormInput(null);
     setFreeReportError(null);
-    setIsFreeReportLoading(false);
     setCurrentReportType(null);
+    // Reset premiumState if necessary, though useActionState handles its own lifecycle
   };
 
-  const isLoading = isFreeReportLoading || isPremiumGenerating;
   const error = freeReportError || (!premiumState?.success && premiumState?.message ? premiumState.message : null);
 
   return (
@@ -118,27 +112,16 @@ export default function CareerPathPage() {
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        {!currentReportData && !isLoading && !error && (
+        {!currentReportData && !error && (
           <section id="input-form" className="mb-12 flex flex-col items-center">
             <CareerForm 
               onFormSubmitSuccess={handleFreeFormSubmitSuccess}
               onFormSubmitError={handleFreeFormSubmitError}
-              setIsLoading={setIsFreeReportLoading}
             />
           </section>
         )}
 
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center text-center p-10 rounded-lg shadow-lg bg-card max-w-md mx-auto">
-            <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
-            <p className="text-xl font-semibold text-primary">
-              {isPremiumGenerating ? "Generating your premium career path..." : "Generating your personalized career path..."}
-            </p>
-            <p className="text-muted-foreground mt-2">This might take a few moments. Please wait.</p>
-          </div>
-        )}
-
-        {error && !isLoading && ( 
+        {error && ( 
           <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto border border-destructive/30">
             <div className="flex items-center justify-center mb-3">
               <AlertTriangle className="h-6 w-6 mr-2" />
@@ -149,7 +132,7 @@ export default function CareerPathPage() {
           </div>
         )}
 
-        {currentReportData && currentReportType && !isLoading && !error && (
+        {currentReportData && currentReportType && !error && (
           <section id="results-display" className="max-w-3xl mx-auto">
             <CareerPathDisplay 
               data={currentReportData} 
@@ -172,4 +155,3 @@ export default function CareerPathPage() {
     </div>
   );
 }
-    
