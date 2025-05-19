@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useActionState, useFormStatus } from 'react'; 
+import { useActionState } from 'react'; 
+import { useFormStatus } from 'react-dom'; // Corrected import for useFormStatus
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
