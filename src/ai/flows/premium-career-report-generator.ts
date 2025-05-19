@@ -116,7 +116,7 @@ export async function generatePremiumCareerPath(appInput: AppStandardCareerPathI
 
 const premiumReportPrompt = ai.definePrompt({
   name: 'premiumCareerGuidancePrompt',
-  // model: 'groq/llama3-70b-8192', // Groq model specification removed, will use default Genkit model
+  // Removed: model: 'groq/llama3-70b-8192', // Will use default model from genkit.ts
   input: {schema: PremiumPromptInputSchema}, 
   output: {schema: PremiumCareerPathOutputSchema}, 
   prompt: `You are a career development expert helping university students and recent graduates in Nigeria transition into job-ready professionals.
@@ -198,15 +198,14 @@ The user is paying for this report, so it must be comprehensive and valuable.
 If 'desiredCareerPath' is "Not specified by user", select the most suitable one based on 'fieldOfStudy' and generate the report for that, clearly stating the chosen path.
 If 'currentSkills' are not provided by the user, the 'probableExistingSkills' should be based on general assumptions for the field of study, and 'criticalSkillsToLearn' should then list all essential skills as needing development.
 `,
-  // Safety settings are more specific to Gemini; Groq may have different defaults or no equivalent settings via Genkit
-  // config: { 
-  //   safetySettings: [ 
-  //     { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-  //     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-  //     { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-  //     { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-  //   ],
-  // }
+  config: { 
+    safetySettings: [ 
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    ],
+  }
 });
 
 const premiumReportFlow = ai.defineFlow(
