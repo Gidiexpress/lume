@@ -10,17 +10,18 @@ import { useToast } from '@/hooks/use-toast';
 import { findAffiliateLink } from '@/lib/affiliateLinks';
 import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
-  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked
+  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, Download
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom'; 
+import { useActionState, useFormStatus } from 'react-dom'; 
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from '@/components/ui/progress';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 interface CareerPathDisplayProps {
@@ -152,6 +153,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
 
   const initialEmailState: EmailFormState = { message: null, success: false };
@@ -196,6 +198,73 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         });
       });
   };
+
+  const handleDownloadPdf = async () => {
+    if (reportType !== 'premium') return;
+    const reportElement = document.getElementById('premium-report-content');
+    if (!reportElement) {
+      toast({
+        title: "Error",
+        description: "Could not find report content to generate PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    try {
+      const canvas = await html2canvas(reportElement, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true, // If you have external images
+        scrollY: -window.scrollY, // Capture from the top
+        windowWidth: reportElement.scrollWidth,
+        windowHeight: reportElement.scrollHeight
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4'); // Portrait, mm, A4 size
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgWidth = imgProps.width;
+      const imgHeight = imgProps.height;
+      
+      const ratio = imgWidth / imgHeight;
+      let newImgWidth = pdfWidth - 20; // With some margin
+      let newImgHeight = newImgWidth / ratio;
+      
+      let heightLeft = newImgHeight;
+      let position = 10; // Top margin
+
+      pdf.addImage(imgData, 'PNG', 10, position, newImgWidth, newImgHeight); // X, Y, Width, Height
+      heightLeft -= (pdfHeight - 20); // Subtract first page height (with margins)
+
+      while (heightLeft > 0) {
+        position = heightLeft - newImgHeight + 10; // Top margin for new page
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 10, position, newImgWidth, newImgHeight);
+        heightLeft -= (pdfHeight - 20);
+      }
+      
+      pdf.save('Lume_Premium_Report.pdf');
+      toast({
+        title: "PDF Downloaded",
+        description: "Your premium report has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "An error occurred while generating the PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
 
   const freeData = reportType === 'free' ? data as CareerPathOutput : null;
   const premiumData = reportType === 'premium' ? data as PremiumCareerPathOutput : null;
@@ -413,9 +482,17 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
             )}
           </div>
         </div>
-        <Button onClick={handleCopyToClipboard} variant="outline">
-          <Copy className="mr-2 h-4 w-4" /> Copy Report
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleCopyToClipboard} variant="outline">
+              <Copy className="mr-2 h-4 w-4" /> Copy Report
+            </Button>
+            {reportType === 'premium' && premiumData && (
+              <Button onClick={handleDownloadPdf} variant="outline" disabled={isGeneratingPdf}>
+                {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Download PDF
+              </Button>
+            )}
+        </div>
       </div>
       
       {/* FREE REPORT DISPLAY */}
@@ -463,7 +540,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
       {/* PREMIUM REPORT DISPLAY (MULTI-PATH) */}
       {premiumData && reportType === 'premium' && (
         premiumData.suggestedCareerPaths && premiumData.suggestedCareerPaths.length > 0 ? (
-          <div className="space-y-6">
+          <div id="premium-report-content" className="space-y-6">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center text-xl">
