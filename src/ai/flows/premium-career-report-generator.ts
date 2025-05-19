@@ -116,8 +116,9 @@ export async function generatePremiumCareerPath(appInput: AppStandardCareerPathI
 
 const premiumReportPrompt = ai.definePrompt({
   name: 'premiumCareerGuidancePrompt',
-  input: {schema: PremiumPromptInputSchema}, // Use the prompt-specific input schema
-  output: {schema: PremiumCareerPathOutputSchema}, // Use the new detailed output schema
+  // model: 'groq/llama3-70b-8192', // Removed Groq model specification, will use default Genkit model
+  input: {schema: PremiumPromptInputSchema}, 
+  output: {schema: PremiumCareerPathOutputSchema}, 
   prompt: `You are a career development expert helping university students and recent graduates in Nigeria transition into job-ready professionals.
 
 The user has already selected a desired career path and shared their academic background. Your job is to generate a premium-quality career guidance report that includes:
@@ -150,7 +151,7 @@ The user has already selected a desired career path and shared their academic ba
 
 5.  **Certifications**
     *   Recommend at least 3 relevant certifications for {{career_path}}.
-    *   For each, include: Name, Issuing Body, Estimated Cost (e.g., "$100", "Varies", "Free"), and a brief explanation of how it helps the user get hired.
+    *   For each, include: Name, IssuingBody, Estimated Cost (e.g., "$100", "Varies", "Free"), and a brief explanation of how it helps the user get hired.
 
 6.  **Tools & Software**
     *   List essential tools or software used in the role of {{career_path}}.
@@ -197,8 +198,8 @@ The user is paying for this report, so it must be comprehensive and valuable.
 If 'desiredCareerPath' is "Not specified by user", select the most suitable one based on 'fieldOfStudy' and generate the report for that, clearly stating the chosen path.
 If 'currentSkills' are not provided by the user, the 'probableExistingSkills' should be based on general assumptions for the field of study, and 'criticalSkillsToLearn' should then list all essential skills as needing development.
 `,
-  config: {
-    safetySettings: [
+  config: { // These safety settings are for Gemini; Groq may have different or no equivalent settings via Genkit
+    safetySettings: [ 
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -209,21 +210,20 @@ If 'currentSkills' are not provided by the user, the 'probableExistingSkills' sh
 
 const premiumReportFlow = ai.defineFlow(
   {
-    name: 'premiumReportGenerationFlow', // Changed name to avoid conflict if old one is cached by Genkit
-    inputSchema: PremiumPromptInputSchema, // Flow's public input uses the prompt-specific schema
+    name: 'premiumReportGenerationFlow',
+    inputSchema: PremiumPromptInputSchema, 
     outputSchema: PremiumCareerPathOutputSchema,
   },
   async (promptInput: PremiumPromptInput) => {
-    // Simulate payment check - in a real app, this would be done before calling this flow,
-    // or the calling action would handle it.
     console.log("Simulating payment verification for premium report for user:", promptInput.name);
     // Assume payment is successful to proceed
 
-    const {output} = await premiumReportPrompt(promptInput);
+    // The prompt 'premiumReportPrompt' will now use the default Genkit model
+    const {output} = await premiumReportPrompt(promptInput); 
     if (!output) {
       throw new Error("Premium report generation failed to produce output.");
     }
     return output;
   }
 );
-    
+
