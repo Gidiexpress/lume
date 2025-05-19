@@ -52,19 +52,21 @@ export default function CareerPathPage() {
           title: 'Premium Report Generated!',
           description: premiumState.message,
         });
+        setIsPaymentModalOpen(false); // Close modal on SUCCESS
       } else if (!premiumState.success) {
         toast({
           title: 'Premium Generation Failed',
           description: premiumState.message || "Could not generate premium report.",
           variant: 'destructive',
         });
+        // On failure, the modal remains open. The button will re-enable as isPremiumGenerating becomes false.
       }
     }
   }, [premiumState, toast]);
 
   const handleUpgradeToPremiumRequest = () => {
     if (originalFormInput) {
-      setIsPaymentModalOpen(true); // Open payment modal instead of directly calling action
+      setIsPaymentModalOpen(true); 
     } else {
       toast({
         title: 'Error',
@@ -75,9 +77,11 @@ export default function CareerPathPage() {
   };
 
   const handleConfirmPayment = () => {
-    setIsPaymentModalOpen(false);
     if (originalFormInput) {
+      // Trigger the action first. The button's isLoading state inside PaymentModal will update.
       premiumFormAction(originalFormInput);
+      // The modal will now close only if the action is successful, handled by the useEffect above.
+      // Or the user can close it manually with "Cancel" or "X".
     }
   };
 
