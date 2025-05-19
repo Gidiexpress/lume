@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { generateCareerPath, type CareerPathInput, type CareerPathOutput } from '@/ai/flows/career-path-generator';
-import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
+import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator'; // Updated import type
 
 const CareerFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -35,7 +35,7 @@ export interface FormState {
   message: string | null;
   fields?: Record<string, string>;
   issues?: string[];
-  data?: CareerPathOutput | PremiumCareerPathOutput | null; // Can hold free or premium data
+  data?: CareerPathOutput | PremiumCareerPathOutput | null; // Can hold free or the new premium multi-path data
   success: boolean;
   reportType?: 'free' | 'premium';
 }
@@ -122,8 +122,8 @@ export async function generatePremiumReportAction(
     // Pass validated data (which is of type CareerPathInput) to the premium career path generator
     const premiumCareerPath = await generatePremiumCareerPath(validatedFields.data as CareerPathInput);
     return {
-      message: 'Premium career path generated successfully!',
-      data: premiumCareerPath,
+      message: 'Premium career path generated successfully! Multiple paths suggested.',
+      data: premiumCareerPath, // This will now be PremiumCareerPathOutput (multi-path structure)
       success: true,
       reportType: 'premium',
     };
@@ -183,3 +183,5 @@ export async function emailResultsAction(
     success: true,
   };
 }
+
+    
