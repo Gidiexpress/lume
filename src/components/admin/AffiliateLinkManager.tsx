@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, Edit3, PlusCircle, AlertTriangle, Link2Icon } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Trash2, Edit3, PlusCircle, AlertTriangle, Link2Icon, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function AffiliateLinkManager() {
@@ -25,9 +25,6 @@ export function AffiliateLinkManager() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Initialize with hardcoded links after component mounts to avoid hydration issues
-    // if COURSE_AFFILIATE_LINKS were dynamic in a real scenario.
-    // For this prototype, it's more about demonstrating client-side state.
     setLinks(JSON.parse(JSON.stringify(COURSE_AFFILIATE_LINKS))); // Deep copy
     setIsMounted(true);
   }, []);
@@ -48,16 +45,16 @@ export function AffiliateLinkManager() {
         displayText: formState.displayText || undefined,
     };
 
-    if (currentLink) { // Editing
+    if (currentLink) { 
       setLinks(links.map(link => (link.title === currentLink.title ? newLink : link)));
-      toast({ title: 'Success', description: 'Affiliate link updated.' });
-    } else { // Adding
+      toast({ title: 'Success', description: 'Affiliate link updated (client-side).' });
+    } else { 
       if (links.find(link => link.title.toLowerCase() === newLink.title.toLowerCase())) {
         toast({ title: 'Error', description: 'A link with this title already exists.', variant: 'destructive'});
         return;
       }
       setLinks([...links, newLink]);
-      toast({ title: 'Success', description: 'Affiliate link added.' });
+      toast({ title: 'Success', description: 'Affiliate link added (client-side).' });
     }
     setIsFormOpen(false);
     setCurrentLink(null);
@@ -72,7 +69,7 @@ export function AffiliateLinkManager() {
 
   const handleDelete = (title: string) => {
     setLinks(links.filter(link => link.title !== title));
-    toast({ title: 'Success', description: 'Affiliate link deleted.' });
+    toast({ title: 'Success', description: 'Affiliate link deleted (client-side).' });
   };
 
   const openAddForm = () => {
@@ -87,7 +84,7 @@ export function AffiliateLinkManager() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Link2Icon className="mr-2 h-6 w-6 text-primary" />
-            Manage Affiliate Links
+            Manage Affiliate Links & Resources
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -101,10 +98,13 @@ export function AffiliateLinkManager() {
     <div className="space-y-6">
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-xl font-semibold flex items-center">
-             <Link2Icon className="mr-2 h-6 w-6 text-primary" />
-            Manage Affiliate Links
-          </CardTitle>
+          <div>
+            <CardTitle className="text-xl font-semibold flex items-center">
+              <Link2Icon className="mr-2 h-6 w-6 text-primary" />
+              Affiliate Links & Resources
+            </CardTitle>
+            <CardDescription>Manage partner course links. Changes are client-side only for this prototype.</CardDescription>
+          </div>
           <Button onClick={openAddForm}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
           </Button>
@@ -116,7 +116,7 @@ export function AffiliateLinkManager() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
+                  <TableHead>Title (Matching Key)</TableHead>
                   <TableHead>Affiliate URL</TableHead>
                   <TableHead>Display Text</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -133,10 +133,10 @@ export function AffiliateLinkManager() {
                     </TableCell>
                     <TableCell>{link.displayText || '-'}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(link)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(link)} aria-label="Edit link">
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(link.title)}>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(link.title)} aria-label="Delete link">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -161,13 +161,14 @@ export function AffiliateLinkManager() {
               <Input
                 id="title"
                 name="title"
-                value={formState.title}
+                value={formState.title || ''}
                 onChange={handleInputChange}
                 className="col-span-3"
-                disabled={!!currentLink} // Disable editing title as it's used as key
+                disabled={!!currentLink} 
+                placeholder="Course title to match"
               />
             </div>
-             {currentLink && <p className="col-span-4 text-xs text-muted-foreground text-center -mt-2">Title cannot be changed after creation. Delete and re-add if needed.</p>}
+             {currentLink && <p className="col-span-4 text-xs text-muted-foreground text-center -mt-2">Title (matching key) cannot be changed after creation.</p>}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="affiliateUrl" className="text-right">
                 URL*
@@ -179,6 +180,7 @@ export function AffiliateLinkManager() {
                 onChange={handleInputChange}
                 className="col-span-3"
                 type="url"
+                placeholder="https://partner.com/course?ref=lume"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -188,10 +190,10 @@ export function AffiliateLinkManager() {
               <Input
                 id="displayText"
                 name="displayText"
-                value={formState.displayText}
+                value={formState.displayText || ''}
                 onChange={handleInputChange}
                 className="col-span-3"
-                placeholder="(Optional)"
+                placeholder="e.g., Special Course Offer (Optional)"
               />
             </div>
           </div>
@@ -204,16 +206,19 @@ export function AffiliateLinkManager() {
         </DialogContent>
       </Dialog>
       
-      <Card className="bg-yellow-50 border-yellow-200 shadow-md">
+      <Card className="bg-blue-50 border-blue-200 shadow-md dark:bg-blue-900/30 dark:border-blue-700">
         <CardHeader>
-          <CardTitle className="text-yellow-700 text-sm flex items-center">
-            <AlertTriangle className="h-4 w-4 mr-2 text-yellow-500" /> Developer Note
+          <CardTitle className="text-blue-700 dark:text-blue-300 text-sm flex items-center">
+            <Info className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" /> Future Enhancements
             </CardTitle>
         </CardHeader>
-        <CardContent className="text-yellow-600 text-sm">
-          Changes made to affiliate links here are **for demonstration purposes only** and are managed in client-side state. 
-          They **will not be saved permanently** and will reset on page refresh. 
-          To make these changes persistent, you would need to integrate server actions with a database (e.g., Firestore).
+        <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-1">
+          <p>To make this module fully functional, the following would be needed:</p>
+          <ul className="list-disc list-inside pl-4">
+            <li>Backend integration (e.g., Firebase Firestore) to persistently save link data.</li>
+            <li>Filtering capabilities (by career path, category).</li>
+            <li>Tracking and display of performance statistics (clicks, conversions) - requires analytics setup.</li>
+          </ul>
         </CardContent>
       </Card>
     </div>
