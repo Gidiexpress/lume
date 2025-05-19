@@ -13,6 +13,7 @@ import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentModal } from '@/components/skills-navigator/PaymentModal';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function CareerPathPage() {
   const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
@@ -33,7 +34,7 @@ export default function CareerPathPage() {
   const handleFreeFormSubmitSuccess = (data: CareerPathOutput, originalInput: CareerPathInput, type: 'free' | 'premium') => {
     setCurrentReportData(data);
     setOriginalFormInput(originalInput);
-    setCurrentReportType(type as 'free');
+    setCurrentReportType(type as 'free'); // Free report is always 'free' type from form
     setFreeReportError(null);
   };
 
@@ -52,14 +53,13 @@ export default function CareerPathPage() {
           title: 'Premium Report Generated!',
           description: premiumState.message,
         });
-        setIsPaymentModalOpen(false); // Close modal on SUCCESS
+        // Modal is already closed by handleConfirmPayment
       } else if (!premiumState.success) {
         toast({
           title: 'Premium Generation Failed',
           description: premiumState.message || "Could not generate premium report.",
           variant: 'destructive',
         });
-        // On failure, the modal remains open. The button will re-enable as isPremiumGenerating becomes false.
       }
     }
   }, [premiumState, toast]);
@@ -78,10 +78,8 @@ export default function CareerPathPage() {
 
   const handleConfirmPayment = () => {
     if (originalFormInput) {
-      // Trigger the action first. The button's isLoading state inside PaymentModal will update.
-      premiumFormAction(originalFormInput);
-      // The modal will now close only if the action is successful, handled by the useEffect above.
-      // Or the user can close it manually with "Cancel" or "X".
+      premiumFormAction(originalFormInput); // Start AI call
+      setIsPaymentModalOpen(false);         // Close modal immediately
     }
   };
 
@@ -91,9 +89,10 @@ export default function CareerPathPage() {
     setFreeReportError(null);
     setCurrentReportType(null);
     setIsPaymentModalOpen(false);
+    // Reset premium action state if needed, though useActionState handles this to some extent
   };
 
-  const error = freeReportError || (!premiumState?.success && premiumState?.message ? premiumState.message : null);
+  const displayError = freeReportError || (!premiumState?.success && premiumState?.message && !isPremiumGenerating ? premiumState.message : null);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -120,7 +119,29 @@ export default function CareerPathPage() {
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        {!currentReportData && !error && (
+        {isPremiumGenerating && (
+          <Card className="w-full max-w-md mx-auto shadow-xl my-12">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold flex items-center justify-center">
+                <Loader2 className="mr-3 h-8 w-8 animate-spin text-primary" />
+                Crafting Your Premium Report...
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center">
+                Hang tight! Our AI is working its magic to generate your detailed, multi-path career guidance. This might take a moment.
+              </p>
+              <div className="w-full bg-muted rounded-full h-2.5 my-6 overflow-hidden">
+                <div className="bg-primary h-2.5 rounded-full animate-pulse w-full"></div>
+              </div>
+               <p className="text-xs text-muted-foreground text-center">
+                Please do not close or refresh this page.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isPremiumGenerating && !currentReportData && !displayError && (
           <section id="input-form" className="mb-12 flex flex-col items-center">
             <CareerForm 
               onFormSubmitSuccess={handleFreeFormSubmitSuccess}
@@ -129,24 +150,24 @@ export default function CareerPathPage() {
           </section>
         )}
 
-        {error && ( 
+        {displayError && !isPremiumGenerating && ( 
           <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto border border-destructive/30">
             <div className="flex items-center justify-center mb-3">
               <AlertTriangle className="h-6 w-6 mr-2" />
-              <p className="font-semibold text-lg">Generation Failed</p>
+              <p className="font-semibold text-lg">Report Generation Failed</p>
             </div>
-            <p className="mb-4">{error}</p>
+            <p className="mb-4">{displayError}</p>
             <Button onClick={handleReset} variant="destructive" className="mt-4">Try Again</Button>
           </div>
         )}
 
-        {currentReportData && currentReportType && !error && (
+        {!isPremiumGenerating && currentReportData && currentReportType && !displayError && (
           <section id="results-display" className="max-w-3xl mx-auto">
             <CareerPathDisplay 
               data={currentReportData} 
               reportType={currentReportType}
               onUpgradeToPremium={handleUpgradeToPremiumRequest}
-              isPremiumLoading={isPremiumGenerating}
+              isPremiumLoading={isPremiumGenerating} // This prop might be less critical for display now
             />
             <div className="mt-8 text-center">
               <Button onClick={handleReset} variant="outline" size="lg">
@@ -161,7 +182,7 @@ export default function CareerPathPage() {
             isOpen={isPaymentModalOpen}
             onClose={() => setIsPaymentModalOpen(false)}
             onConfirmPayment={handleConfirmPayment}
-            isLoading={isPremiumGenerating}
+            isLoading={isPremiumGenerating} // Button inside modal will still show loading state
           />
         )}
       </main>
