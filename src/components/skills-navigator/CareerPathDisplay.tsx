@@ -7,14 +7,14 @@ import { SectionCard } from './SectionCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { findAffiliateLink } from '@/lib/affiliateLinks';
+import { fetchAndCacheAffiliateLinks, findAffiliateLinkInCache } from '@/lib/affiliateLinks'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
   Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, ChevronsRight, HandHelping, Rocket
 } from 'lucide-react';
 import Link from 'next/link';
-import React from 'react'; // Changed from import React, { useState, useMemo, useEffect, useActionState }
-import { useFormStatus } from 'react-dom';
+import React from 'react'; 
+import { useFormStatus } from 'react-dom'; // Corrected: useFormStatus from react-dom
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -63,7 +63,9 @@ function formatSinglePremiumReportForCopy(report: PremiumCareerPathOutput['sugge
 
   text += `== Learning Resources ==\n`;
   report.learningResources.forEach(res => {
-    text += `- ${res.title} – ${res.platform}${res.urlSuggestion ? ` (Link/Search: ${res.urlSuggestion})` : ''} ${res.isFree ? '(Free)' : '(Paid)'}\n`;
+    // For copy, we might not resolve affiliate links, just use the AI suggested URL or search term
+    const linkInfo = res.urlSuggestion ? ` (Link/Search: ${res.urlSuggestion})` : '';
+    text += `- ${res.title} – ${res.platform}${linkInfo} ${res.isFree ? '(Free)' : '(Paid)'}\n`;
   });
   text += `\n`;
 
@@ -113,7 +115,9 @@ function formatSingleFreePathForCopy(path: CareerPathOutput['suggestedCareerPath
   text += `  Essential Skills to Start:\n    - ${path.essentialSkillsToStart.join('\n    - ')}\n`;
   text += `  Learning Resources:\n`;
   path.learningResources.forEach(res => {
-    text += `    - ${res.title} – ${res.platform}${res.link ? ` (Link: ${res.link})` : ''}\n`;
+    // For copy, use the AI suggested link or search term
+    const linkInfo = res.link ? ` (Link/Search: ${res.link})` : '';
+    text += `    - ${res.title} – ${res.platform}${linkInfo}\n`;
   });
   text += "\n";
   return text;
@@ -172,11 +176,27 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [activeAccordionItem, setActiveAccordionItem] = React.useState<string | undefined>(undefined);
+  const [affiliateLinksLoaded, setAffiliateLinksLoaded] = React.useState(false);
 
 
   const initialEmailState: EmailFormState = { message: null, success: false };
+  // useActionState should be imported from 'react' for client components in recent React versions
   const [emailFormState, dispatchEmailAction] = React.useActionState(emailResultsAction, initialEmailState);
   
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadLinks() {
+      await fetchAndCacheAffiliateLinks();
+      if (isMounted) {
+        setAffiliateLinksLoaded(true);
+      }
+    }
+    loadLinks();
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Runs once on mount
+
   const resultsTextForEmail = React.useMemo(() => formatResultsForCopy(data, reportType), [data, reportType]);
 
   React.useEffect(() => {
@@ -198,12 +218,11 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
 
   React.useEffect(() => {
     if (reportType === 'premium' && premiumData?.suggestedCareerPaths?.length) {
-      setActiveAccordionItem(`path-${0}`); // Open the first path by default
+      setActiveAccordionItem(`path-${0}`); 
     } else if (reportType === 'free' && freeData?.suggestedCareerPaths?.length) {
-       setActiveAccordionItem(`free-path-0`); // Open the first free path by default
+       setActiveAccordionItem(`free-path-0`); 
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, reportType]); 
+  }, [data, reportType, premiumData?.suggestedCareerPaths, freeData?.suggestedCareerPaths]); 
 
   const handleCopyToClipboard = () => {
     const textToCopy = formatResultsForCopy(data, reportType);
@@ -298,7 +317,8 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
           <SectionCard title="Curated Learning Resources" icon={BookCopy}>
             <div className="space-y-3">
               {report.learningResources.map((res, index) => {
-                const affiliateLink = findAffiliateLink(res.title);
+                // Use findAffiliateLinkInCache only if affiliateLinksLoaded is true
+                const affiliateLink = affiliateLinksLoaded ? findAffiliateLinkInCache(res.title) : undefined;
                 const finalUrl = affiliateLink ? affiliateLink.affiliateUrl : (res.urlSuggestion && res.urlSuggestion.startsWith('http') ? res.urlSuggestion : `https://www.google.com/search?q=${encodeURIComponent(res.title + " " + res.platform)}`);
                 const linkText = affiliateLink ? (affiliateLink.displayText || res.title) : res.title;
 
@@ -317,6 +337,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
                   </div>
                 );
               })}
+               {!affiliateLinksLoaded && <p className="text-xs text-muted-foreground">Loading affiliate link information...</p>}
             </div>
           </SectionCard>
           
@@ -446,7 +467,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
                 <SectionCard title="How to Start Learning" icon={Rocket}>
                     <div className="space-y-3">
                         {path.learningResources.map((res, index) => {
-                            const affiliateLinkObj = findAffiliateLink(res.title);
+                            const affiliateLinkObj = affiliateLinksLoaded ? findAffiliateLinkInCache(res.title) : undefined;
                             const finalUrl = affiliateLinkObj ? affiliateLinkObj.affiliateUrl : (res.link || `https://www.google.com/search?q=${encodeURIComponent(res.title + " " + res.platform)}`);
                             const linkText = affiliateLinkObj ? (affiliateLinkObj.displayText || res.title) : res.title;
                             return (
@@ -461,6 +482,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
                                 </div>
                             );
                         })}
+                        {!affiliateLinksLoaded && <p className="text-xs text-muted-foreground">Loading affiliate link information...</p>}
                     </div>
                 </SectionCard>
             </AccordionContent>
