@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { findAffiliateLink } from '@/lib/affiliateLinks';
 import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
-  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked
+  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, ChevronsRight, HandHelping, Rocket
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -105,6 +105,20 @@ function formatSinglePremiumReportForCopy(report: PremiumCareerPathOutput['sugge
   return text;
 }
 
+function formatSingleFreePathForCopy(path: CareerPathOutput['suggestedCareerPaths'][0]): string {
+  let text = `Path: ${path.pathName}\n`;
+  text += `  Overview: ${path.overview}\n`;
+  text += `  Reason it Fits: ${path.reasonItFits}\n`;
+  text += `  Typical Responsibilities:\n    - ${path.typicalResponsibilities.join('\n    - ')}\n`;
+  text += `  Essential Skills to Start:\n    - ${path.essentialSkillsToStart.join('\n    - ')}\n`;
+  text += `  Learning Resources:\n`;
+  path.learningResources.forEach(res => {
+    text += `    - ${res.title} – ${res.platform}${res.link ? ` (Link: ${res.link})` : ''}\n`;
+  });
+  text += "\n";
+  return text;
+}
+
 
 function formatResultsForCopy(data: CareerPathOutput | PremiumCareerPathOutput, reportType: 'free' | 'premium'): string {
   let text = `Lume - Your ${reportType === 'premium' ? 'Premium Multi-Path' : 'Free Summary'} Career Report\n\n`;
@@ -125,12 +139,19 @@ function formatResultsForCopy(data: CareerPathOutput | PremiumCareerPathOutput, 
     }
   } else { // Free report
       const freeData = data as CareerPathOutput;
-      text += `Job Roles:\n- ${freeData.jobRoles.join('\n- ')}\n\n`;
-      text += `Technical Skills:\n- ${freeData.technicalSkills.join('\n- ')}\n\n`;
-      text += `Soft Skills:\n- ${freeData.softSkills.join('\n- ')}\n\n`;
-      text += `Tools & Platforms:\n- ${freeData.toolsAndPlatforms.join('\n- ')}\n\n`;
-      text += `Course Suggestions:\n- ${freeData.courseSuggestions.join('\n- ')}\n\n`;
-      text += `Beginner Project Idea:\n${freeData.beginnerProjectIdea}\n`;
+      text += "Here are some career paths Lume suggests for you based on your field of study:\n\n";
+      if (freeData.suggestedCareerPaths && freeData.suggestedCareerPaths.length > 0) {
+        freeData.suggestedCareerPaths.forEach((path, index) => {
+          text += `--- Career Path ${index + 1} ---\n`;
+          text += formatSingleFreePathForCopy(path);
+        });
+        text += `\n== Encouragement & Advice ==\n${freeData.encouragementAndAdvice}\n`;
+      } else {
+        text += "No career paths were suggested in this free report.\n";
+        if (freeData.encouragementAndAdvice) {
+           text += `\n== Encouragement & Advice ==\n${freeData.encouragementAndAdvice}\n`;
+        }
+      }
   }
   return text;
 }
@@ -172,13 +193,17 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
   }, [emailFormState, toast]);
 
   const premiumData = reportType === 'premium' ? data as PremiumCareerPathOutput : null;
+  const freeData = reportType === 'free' ? data as CareerPathOutput : null;
+
 
   useEffect(() => {
     if (reportType === 'premium' && premiumData?.suggestedCareerPaths?.length) {
       setActiveAccordionItem(`path-${0}`); // Open the first path by default
+    } else if (reportType === 'free' && freeData?.suggestedCareerPaths?.length) {
+       setActiveAccordionItem(`free-path-0`); // Open the first free path by default
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, reportType, premiumData]); 
+  }, [data, reportType]); 
 
   const handleCopyToClipboard = () => {
     const textToCopy = formatResultsForCopy(data, reportType);
@@ -198,8 +223,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         });
       });
   };
-
-  const freeData = reportType === 'free' ? data as CareerPathOutput : null;
   
 
   const renderListItem = (item: string, index: number) => <li key={index} className="text-sm">{item}</li>;
@@ -394,6 +417,58 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     );
   };
 
+  const renderFreeReportPath = (path: CareerPathOutput['suggestedCareerPaths'][0], pathIndex: number) => {
+    return (
+        <AccordionItem value={`free-path-${pathIndex}`} key={`free-path-${pathIndex}`}>
+            <AccordionTrigger className="text-lg font-medium hover:no-underline">
+                <div className="flex flex-col text-left">
+                    <span>{pathIndex + 1}. {path.pathName}</span>
+                </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-6 pt-4 pl-2">
+                <SectionCard title="Path Overview" icon={Info}>
+                    <p className="text-foreground/90 mb-2">{path.overview}</p>
+                    <p className="text-sm text-muted-foreground"><strong>Why it fits your background:</strong> {path.reasonItFits}</p>
+                </SectionCard>
+
+                <SectionCard title="What You'll Be Doing" icon={Briefcase}>
+                    <ul className="list-disc list-inside space-y-1 text-foreground/80">
+                        {path.typicalResponsibilities.map(renderListItem)}
+                    </ul>
+                </SectionCard>
+
+                <SectionCard title="Essential Skills to Start" icon={CodeXml}>
+                     <ul className="list-disc list-inside space-y-1 text-foreground/80">
+                        {path.essentialSkillsToStart.map(renderListItem)}
+                    </ul>
+                </SectionCard>
+
+                <SectionCard title="How to Start Learning" icon={Rocket}>
+                    <div className="space-y-3">
+                        {path.learningResources.map((res, index) => {
+                            const affiliateLinkObj = findAffiliateLink(res.title);
+                            const finalUrl = affiliateLinkObj ? affiliateLinkObj.affiliateUrl : (res.link || `https://www.google.com/search?q=${encodeURIComponent(res.title + " " + res.platform)}`);
+                            const linkText = affiliateLinkObj ? (affiliateLinkObj.displayText || res.title) : res.title;
+                            return (
+                                <div key={`free-learn-${path.pathName}-${index}`} className="p-3 border rounded-md bg-background/50 hover:shadow-md transition-shadow">
+                                    <h5 className="font-semibold">{linkText}</h5>
+                                    <p className="text-sm text-muted-foreground">Platform: {res.platform}</p>
+                                    <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline inline-flex items-center">
+                                        {affiliateLinkObj ? "View Course (Partner)" : (res.link ? "Visit Link" : "Search Resource")}
+                                        <ExternalLink className="ml-1 h-3 w-3" />
+                                    </a>
+                                    {affiliateLinkObj && <Badge variant="outline" className="ml-2 border-primary/50 text-primary text-xs">Partner Link</Badge>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </SectionCard>
+            </AccordionContent>
+        </AccordionItem>
+    );
+  };
+
+
   return (
     <div className="space-y-8 mt-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border rounded-lg bg-card shadow">
@@ -405,10 +480,10 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
           )}
           <div>
             <h2 className="text-2xl font-semibold">
-              Your {reportType === 'premium' ? 'Premium Multi-Path' : 'Free Summary'} Report
+              Your {reportType === 'premium' ? 'Premium Multi-Path' : 'Free Career'} Report
             </h2>
              {reportType === 'free' && (
-                <p className="text-sm text-muted-foreground">This is a starting point. Explore below or upgrade for an in-depth multi-path analysis!</p>
+                <p className="text-sm text-muted-foreground">Here are some career paths based on your field of study. Explore them below!</p>
             )}
              {reportType === 'premium' && premiumData?.suggestedCareerPaths && (
                 <p className="text-sm text-muted-foreground">Lume has identified {premiumData.suggestedCareerPaths.length} potential career paths for you. Explore each below.</p>
@@ -425,40 +500,35 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
       {/* FREE REPORT DISPLAY */}
       {freeData && reportType === 'free' && (
         <>
-          <SectionCard title="Suggested Job Roles" icon={Briefcase}>
-            <ul className="list-disc list-inside space-y-1.5 text-foreground/90">{freeData.jobRoles.map(renderListItem)}</ul>
-          </SectionCard>
-          <SectionCard title="Basic Technical Skills" icon={CodeXml}>
-            <ul className="list-disc list-inside space-y-1.5 text-foreground/90">{freeData.technicalSkills.map(renderListItem)}</ul>
-          </SectionCard>
-          <SectionCard title="Essential Soft Skills" icon={Users}>
-            <ul className="list-disc list-inside space-y-1.5 text-foreground/90">{freeData.softSkills.map(renderListItem)}</ul>
-          </SectionCard>
-          <SectionCard title="Common Tools & Platforms" icon={Laptop}>
-            <ul className="list-disc list-inside space-y-1.5 text-foreground/90">{freeData.toolsAndPlatforms.map(renderListItem)}</ul>
-          </SectionCard>
-          {freeData.courseSuggestions && freeData.courseSuggestions.length > 0 && (
-            <SectionCard title="General Course Suggestions" icon={BookOpenCheck}>
-              <ul className="list-disc list-inside space-y-2 text-foreground/90">
-                {freeData.courseSuggestions.map((course, index) => {
-                  const affiliateLink = findAffiliateLink(course);
-                  if (affiliateLink) {
-                    return (
-                      <li key={index}>
-                        <Link href={affiliateLink.affiliateUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
-                          {affiliateLink.displayText || course} <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-xs">Partner Link</Badge>
-                        </Link>
-                      </li>
-                    );
-                  }
-                  return <li key={index}>{course}</li>;
-                })}
-              </ul>
+          {freeData.suggestedCareerPaths && freeData.suggestedCareerPaths.length > 0 ? (
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center text-xl">
+                        <ChevronsRight className="mr-2 h-6 w-6 text-primary"/>
+                        Suggested Career Paths
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Accordion 
+                        type="single" 
+                        collapsible 
+                        className="w-full" 
+                        value={activeAccordionItem}
+                        onValueChange={setActiveAccordionItem}
+                    >
+                        {freeData.suggestedCareerPaths.map(renderFreeReportPath)}
+                    </Accordion>
+                </CardContent>
+            </Card>
+          ) : (
+             <SectionCard title="Career Path Suggestions" icon={Info}>
+                <p className="text-muted-foreground">No specific career paths were suggested in your free report. This might be due to the input provided or an issue with the generation. Please try again or refine your input.</p>
             </SectionCard>
           )}
-          {freeData.beginnerProjectIdea && (
-            <SectionCard title="Simple Beginner Project Idea" icon={Lightbulb}>
-              <p className="text-foreground/90">{freeData.beginnerProjectIdea}</p>
+
+          {freeData.encouragementAndAdvice && (
+            <SectionCard title="Encouragement & Next Steps" icon={HandHelping} className="bg-secondary/30 dark:bg-secondary/20">
+              <p className="text-foreground/90 whitespace-pre-line">{freeData.encouragementAndAdvice}</p>
             </SectionCard>
           )}
         </>
@@ -510,7 +580,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         )
       )}
 
-      {/* Moved "Upgrade to Premium" card here for free reports */}
       {reportType === 'free' && (
         <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10 mt-12">
           <CardHeader>
@@ -521,7 +590,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-foreground/90">
-              You've got the basics! Elevate your career planning with our Premium Report. Get multiple tailored career path suggestions, each with a detailed roadmap, skill gap analysis, curated learning resources, project ideas, resume tips, and Nigerian job market insights.
+              You've got a starting point! Elevate your career planning with our Premium Report. Get multiple tailored career path suggestions, each with a detailed roadmap, skill gap analysis, curated learning resources, project ideas, resume tips, and Nigerian job market insights.
             </p>
             <Button 
               size="lg" 
@@ -568,3 +637,4 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     </div>
   );
 }
+
