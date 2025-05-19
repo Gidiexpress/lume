@@ -34,7 +34,7 @@ const SingleFreeCareerPathSchema = z.object({
   learningResources: z.array(z.object({
     title: z.string().describe("Title of the learning resource."),
     platform: z.string().describe("Platform where the resource can be found (e.g., YouTube, Coursera)."),
-    link: z.string().url().optional().describe("A direct URL to the resource if available, or a search query URL. If a direct link is not easily known or is too specific (like a deep search result), suggest a more general platform link or a good search term for Google/YouTube."),
+    link: z.string().optional().describe("A direct URL to the resource, a search query URL, or a search term suggestion. e.g., https://www.coursera.org or 'Search: Intro to UX on YouTube'."),
   })).min(1).max(2).describe("1-2 beginner learning resources for this path.")
 });
 
@@ -81,7 +81,8 @@ The user has entered their field of study. Your task is to generate a concise, h
 
 4. 🚀 **How to Start Learning**
 - Suggest 1–2 beginner resources for each path (free courses, YouTube videos, or platforms).
-- Format: [Course Title] – Platform – Link. If a direct link is not easily known or stable, provide a general platform link (e.g., www.coursera.org) or a good search query (e.g., "Search: Introduction to UX Design on YouTube").
+- Format: [Course Title] – Platform – Link
+- For the 'Link' field: Provide a direct URL to the resource if available and stable (e.g., www.coursera.org/learn/python). If not, provide a general platform link (e.g., www.youtube.com) or a good search query string (e.g., "Search: Introduction to UX Design on YouTube"). The schema for 'link' accepts any string.
 
 5. 💬 **Encouragement & Advice**
 - End with a short paragraph offering career encouragement and a next-step mindset.
@@ -103,6 +104,7 @@ The user has entered their field of study. Your task is to generate a concise, h
 - Use bold headers for each section as suggested by the Zod schema descriptions (e.g., pathName, overview).
 - Use short paragraphs and bullet points for easy reading.
 - Be warm, clear, and encouraging — speak to someone early in their career journey.
+- Ensure the output strictly conforms to the defined Zod schema, especially the array structures and counts for suggestedCareerPaths, typicalResponsibilities, essentialSkillsToStart, and learningResources.
 
 ---
 
@@ -118,20 +120,12 @@ const generateFreeReportFlow = ai.defineFlow(
     outputSchema: CareerPathOutputSchema,
   },
   async input => {
-    // Ensure optional fields are passed correctly, or explicitly undefined if not present
-    const promptInput = {
-      ...input,
-      learningPreference: input.learningPreference || undefined,
-      additionalContext: input.additionalContext || undefined,
-      // Fields not used by free prompt but part of CareerPathInput can be omitted or passed
-      email: input.email || undefined,
-      university: input.university || undefined,
-      currentSkills: input.currentSkills || undefined,
-      desiredCareerPath: input.desiredCareerPath || undefined,
-    };
-    const {output} = await freeReportPrompt(promptInput);
+    // The input already conforms to CareerPathInputSchema.
+    // The freeReportPrompt's input schema is also CareerPathInputSchema.
+    // Handlebars template will pick the fields it needs (fullName, fieldOfStudy, etc.).
+    const {output} = await freeReportPrompt(input);
     if (!output) {
-      throw new Error("Free report generation failed to produce output.");
+      throw new Error("Free report generation failed to produce output. The AI model might not have returned data conforming to the expected schema.");
     }
     return output;
   }
