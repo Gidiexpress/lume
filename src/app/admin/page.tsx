@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,34 +12,69 @@ import { AffiliateLinkManager } from '@/components/admin/AffiliateLinkManager';
 import { PaymentsDashboard } from '@/components/admin/PaymentsDashboard';
 import { AiActivityMonitor } from '@/components/admin/AiActivityMonitor';
 import { FeedbackManager } from '@/components/admin/FeedbackManager';
-import { LayoutDashboard, Link2, LineChart, DollarSign, BrainCircuit, MessageSquare, LogOut, Loader2, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Link2, LineChart, DollarSign, BrainCircuit, MessageSquare, LogOut, Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPage() {
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         router.replace('/admin/login');
-      } else {
-        setUser(currentUser);
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+      
+      setUser(currentUser);
+      try {
+        const idTokenResult = await currentUser.getIdTokenResult();
+        if (idTokenResult.claims.admin === true) {
+          setIsAuthorized(true);
+        } else {
+          setIsAuthorized(false);
+          toast({
+            title: 'Unauthorized',
+            description: 'You do not have permission to access the admin dashboard.',
+            variant: 'destructive',
+          });
+          await signOut(auth); // Sign out the non-admin user
+          router.replace('/admin/login?error=unauthorized');
+        }
+      } catch (error) {
+        console.error("Error fetching custom claims:", error);
+        setIsAuthorized(false);
+        toast({
+            title: 'Authentication Error',
+            description: 'Could not verify admin privileges. Please try again.',
+            variant: 'destructive',
+          });
+        await signOut(auth);
+        router.replace('/admin/login?error=claims_error');
+      } finally {
+        setIsLoading(false);
+      }
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, toast]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.replace('/admin/login'); // Redirect to login page after logout
+      router.replace('/admin/login'); 
     } catch (error) {
       console.error("Error signing out: ", error);
-      // Optionally, show a toast message for logout failure
+      toast({
+        title: 'Logout Failed',
+        description: 'An error occurred while trying to log out.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -47,17 +82,24 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-muted-foreground">Verifying access...</p>
       </div>
     );
   }
 
-  if (!user) {
-    // This case should ideally be handled by the redirect in onAuthStateChanged,
-    // but it's a fallback.
+  if (!user || !isAuthorized) {
+    // This path should ideally be caught by the redirect in onAuthStateChanged
+    // or if authorization fails.
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-         <p className="text-lg mb-4">Redirecting to login...</p>
-         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+         <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
+         <p className="text-muted-foreground mb-6 text-center">
+            You are not authorized to view this page or your session has expired.
+         </p>
+         <Button onClick={() => router.push('/admin/login')}>
+            Go to Login
+         </Button>
       </div>
     );
   }
@@ -85,7 +127,7 @@ export default function AdminPage() {
         </div>
       </header>
       <main className="flex-grow container mx-auto px-4 py-8">
-        <p className="text-sm text-muted-foreground mb-4">Logged in as: {user.email}</p>
+        <p className="text-sm text-muted-foreground mb-4">Logged in as: {user.email} (Admin)</p>
         <Tabs defaultValue="analytics" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6">
             <TabsTrigger value="analytics">

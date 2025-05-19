@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,11 +19,34 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const authError = searchParams.get('error');
+    if (authError === 'unauthorized') {
+      setError('Access Denied: You are not authorized to access the admin dashboard.');
+    } else if (authError === 'claims_error') {
+      setError('Error: Could not verify admin privileges. Please contact support.');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        router.replace('/admin'); // If user is already logged in, redirect to admin dashboard
+        try {
+          const idTokenResult = await user.getIdTokenResult();
+          if (idTokenResult.claims.admin === true) {
+            router.replace('/admin'); // If user is admin, redirect to admin dashboard
+          } else {
+            // If user is logged in but not admin, keep them on login or show error
+            // but don't auto-redirect to /admin.
+            // The /admin page will handle its own unauthorized logic.
+            setIsCheckingAuth(false); 
+          }
+        } catch {
+          // Error fetching claims, treat as unauthorized for now
+          setIsCheckingAuth(false);
+        }
       } else {
         setIsCheckingAuth(false);
       }
@@ -36,10 +59,21 @@ export default function AdminLoginPage() {
     setError(null);
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/admin'); // Redirect to admin dashboard on successful login
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idTokenResult = await userCredential.user.getIdTokenResult();
+
+      if (idTokenResult.claims.admin === true) {
+        router.replace('/admin'); 
+      } else {
+        await signOut(auth); // Sign out non-admin user
+        setError('Access Denied: You do not have admin privileges.');
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError(err.message || 'Failed to login. Please check your credentials.');
+      }
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
