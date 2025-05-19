@@ -1,40 +1,52 @@
+
+import { db } from '@/lib/firebase/config'; // Ensure Firebase is initialized
+import { collection, getDocs, query, where } from 'firebase/firestore';
+
 export interface CourseLink {
+  id?: string; // Document ID from Firestore
   title: string; // Case-insensitive matching target
   affiliateUrl: string;
   displayText?: string; // Optional: if the link text should be different from the matched title
 }
 
-// Example affiliate links. Replace with actual data.
-export const COURSE_AFFILIATE_LINKS: CourseLink[] = [
-  { 
-    title: "Introduction to Python", 
-    affiliateUrl: "https://www.example.com/python-course?ref=lume",
-    displayText: "Python for Beginners (View Course)" 
-  },
-  { 
-    title: "Advanced JavaScript", 
-    affiliateUrl: "https://www.example.com/advanced-js?ref=lume",
-    displayText: "Master Advanced JavaScript (View Course)"
-  },
-  { 
-    title: "Machine Learning Fundamentals", 
-    affiliateUrl: "https://www.example.com/ml-fundamentals?ref=lume"
-  },
-  {
-    title: "Data Structures and Algorithms in Java",
-    affiliateUrl: "https://www.example.com/java-dsa?ref=lume",
-    displayText: "Java Data Structures & Algorithms (View Course)"
-  },
-  {
-    title: "UX Design Principles",
-    affiliateUrl: "https://www.example.com/ux-design?ref=lume"
-  }
-];
+// This variable will now be populated from Firestore.
+// It can serve as a cache to avoid frequent DB calls if needed, but for simplicity,
+// findAffiliateLink will fetch directly or you can pre-fetch on app load.
+let COURSE_AFFILIATE_LINKS: CourseLink[] = [];
+let linksFetched = false;
 
-export function findAffiliateLink(courseTitle: string): CourseLink | undefined {
+// Function to fetch links from Firestore and cache them
+export async function fetchAffiliateLinksFromDB(): Promise<CourseLink[]> {
+  if (linksFetched && COURSE_AFFILIATE_LINKS.length > 0) {
+    return COURSE_AFFILIATE_LINKS;
+  }
+  try {
+    const affiliateLinksCollection = collection(db, 'affiliateLinks');
+    const snapshot = await getDocs(affiliateLinksCollection);
+    COURSE_AFFILIATE_LINKS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CourseLink));
+    linksFetched = true;
+    return COURSE_AFFILIATE_LINKS;
+  } catch (error) {
+    console.error("Error fetching affiliate links from Firestore:", error);
+    return []; // Return empty or previously cached links in case of error
+  }
+}
+
+
+export async function findAffiliateLink(courseTitle: string): Promise<CourseLink | undefined> {
   if (!courseTitle) return undefined;
+
+  // Ensure links are fetched if not already
+  if (!linksFetched) {
+    await fetchAffiliateLinksFromDB();
+  }
+  
   const normalizedCourseTitle = courseTitle.toLowerCase().trim();
   return COURSE_AFFILIATE_LINKS.find(
     link => link.title.toLowerCase().trim() === normalizedCourseTitle
   );
 }
+
+// To make links available for admin management (they are fetched in the component now)
+// This constant export might not be directly used by the admin panel anymore if it fetches fresh data.
+export { COURSE_AFFILIATE_LINKS as MANAGED_AFFILIATE_LINKS_CACHE };
