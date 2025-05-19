@@ -42,15 +42,10 @@ export default function CareerPathPage() {
     setFreeReportError(errorMessage);
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    // Explicitly ensure premium loading indicator is also off if a free report error occurs
-    // This scenario is less likely to be an issue but good for completeness
-    if (isPremiumGenerating && premiumState && !premiumState.success) {
-        // No direct way to stop useActionState's pending state, it resolves with the action
-    }
   };
 
   useEffect(() => {
-    if (premiumState?.message && !isPremiumGenerating) { // Check isPremiumGenerating to avoid premature toasts
+    if (premiumState?.message && !isPremiumGenerating) { 
       if (premiumState.success && premiumState.data) {
         setCurrentReportData(premiumState.data as PremiumCareerPathOutput);
         setCurrentReportType('premium');
@@ -58,7 +53,6 @@ export default function CareerPathPage() {
           title: 'Premium Report Generated!',
           description: premiumState.message,
         });
-        // Modal is closed by handleConfirmPayment or should be confirmed closed here if error
       } else if (!premiumState.success) {
         toast({
           title: 'Premium Generation Failed',
@@ -66,8 +60,6 @@ export default function CareerPathPage() {
           variant: 'destructive',
         });
       }
-      // If modal was open during error, ensure it's closed or user can close it
-      // setIsPaymentModalOpen(false); // Consider if modal should auto-close on error. Currently, it doesn't.
     }
   }, [premiumState, toast, isPremiumGenerating]);
 
@@ -98,16 +90,9 @@ export default function CareerPathPage() {
     setFreeReportError(null);
     setCurrentReportType(null);
     setIsPaymentModalOpen(false);
-    // Reset premium action state if needed, though useActionState handles this to some extent
-    // For a full reset of useActionState, a component key change or manual reset of its initial state might be needed,
-    // but usually not required for this flow.
   };
 
-  // Determine if the dedicated premium loading screen should be shown
-  const showPremiumLoadingScreen = isPremiumGenerating && !currentReportData && !freeReportError;
-  // Determine if an error specific to premium generation should be displayed
   const premiumError = !isPremiumGenerating && premiumState && !premiumState.success ? premiumState.message : null;
-  // Combine free and premium errors for display
   const displayError = freeReportError || premiumError;
 
   return (
@@ -135,7 +120,7 @@ export default function CareerPathPage() {
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        {showPremiumLoadingScreen && (
+        {isPremiumGenerating ? (
           <Card className="w-full max-w-md mx-auto shadow-xl my-12">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold flex items-center justify-center">
@@ -155,18 +140,7 @@ export default function CareerPathPage() {
               </p>
             </CardContent>
           </Card>
-        )}
-
-        {!isPremiumGenerating && !currentReportData && !displayError && (
-          <section id="input-form" className="mb-12 flex flex-col items-center">
-            <CareerForm 
-              onFormSubmitSuccess={handleFreeFormSubmitSuccess}
-              onFormSubmitError={handleFreeFormSubmitError}
-            />
-          </section>
-        )}
-
-        {displayError && !isPremiumGenerating && ( 
+        ) : displayError ? (
           <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto border border-destructive/30">
             <div className="flex items-center justify-center mb-3">
               <AlertTriangle className="h-6 w-6 mr-2" />
@@ -175,9 +149,7 @@ export default function CareerPathPage() {
             <p className="mb-4">{displayError}</p>
             <Button onClick={handleReset} variant="destructive" className="mt-4">Try Again</Button>
           </div>
-        )}
-
-        {!isPremiumGenerating && currentReportData && currentReportType && !displayError && (
+        ) : currentReportData && currentReportType ? (
           <section id="results-display" className="max-w-3xl mx-auto">
             <CareerPathDisplay 
               data={currentReportData} 
@@ -190,6 +162,13 @@ export default function CareerPathPage() {
                 Generate Another Path
               </Button>
             </div>
+          </section>
+        ) : (
+          <section id="input-form" className="mb-12 flex flex-col items-center">
+            <CareerForm 
+              onFormSubmitSuccess={handleFreeFormSubmitSuccess}
+              onFormSubmitError={handleFreeFormSubmitError}
+            />
           </section>
         )}
 
