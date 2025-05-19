@@ -13,8 +13,8 @@ import {
   Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, Download
 } from 'lucide-react';
 import Link from 'next/link';
-import React, { useState, useMemo, useEffect } from 'react';
-import { useActionState, useFormStatus } from 'react-dom'; 
+import React, { useState, useMemo, useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom'; 
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -178,7 +178,8 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     if (reportType === 'premium' && premiumData?.suggestedCareerPaths?.length) {
       setActiveAccordionItem(`path-${0}`); // Open the first path by default
     }
-  }, [data, reportType]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, reportType]); // premiumData is derived from data and reportType, so no need to add it explicitly if data/reportType are deps
 
   const handleCopyToClipboard = () => {
     const textToCopy = formatResultsForCopy(data, reportType);
@@ -641,4 +642,3 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     </div>
   );
 }
-
