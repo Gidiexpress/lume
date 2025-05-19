@@ -406,7 +406,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
               Your {reportType === 'premium' ? 'Premium Multi-Path' : 'Free Summary'} Report
             </h2>
              {reportType === 'free' && (
-                <p className="text-sm text-muted-foreground">This is a starting point. Upgrade for an in-depth multi-path analysis!</p>
+                <p className="text-sm text-muted-foreground">This is a starting point. Explore below or upgrade for an in-depth multi-path analysis!</p>
             )}
              {reportType === 'premium' && premiumData?.suggestedCareerPaths && (
                 <p className="text-sm text-muted-foreground">Lume has identified {premiumData.suggestedCareerPaths.length} potential career paths for you. Explore each below.</p>
@@ -418,35 +418,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         </Button>
       </div>
       
-      {reportType === 'free' && (
-        <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary flex items-center">
-              <Zap className="mr-2 h-6 w-6" />
-              Unlock Your Full Potential!
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-foreground/90">
-              You've got the basics! Elevate your career planning with our Premium Report. Get multiple tailored career path suggestions, each with a detailed roadmap, skill gap analysis, curated learning resources, project ideas, resume tips, and Nigerian job market insights.
-            </p>
-            <Button 
-              size="lg" 
-              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-md" 
-              onClick={onUpgradeToPremium}
-              disabled={isPremiumLoading}
-            >
-              {isPremiumLoading ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-5 w-5" />
-              )}
-              Upgrade to Premium Report (₦1000)
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* FREE REPORT DISPLAY */}
       {freeData && reportType === 'free' && (
         <>
@@ -535,6 +506,35 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         )
       )}
 
+      {/* Moved "Upgrade to Premium" card here for free reports */}
+      {reportType === 'free' && (
+        <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10 mt-12">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-primary flex items-center">
+              <Zap className="mr-2 h-6 w-6" />
+              Unlock Your Full Potential!
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-foreground/90">
+              You've got the basics! Elevate your career planning with our Premium Report. Get multiple tailored career path suggestions, each with a detailed roadmap, skill gap analysis, curated learning resources, project ideas, resume tips, and Nigerian job market insights.
+            </p>
+            <Button 
+              size="lg" 
+              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-md" 
+              onClick={onUpgradeToPremium}
+              disabled={isPremiumLoading}
+            >
+              {isPremiumLoading ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-5 w-5" />
+              )}
+              Upgrade to Premium Report (₦1000)
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <SectionCard title="Email These Results" icon={Mail} className="bg-secondary/30 dark:bg-secondary/20">
          <form action={dispatchEmailAction} className="space-y-4">
@@ -565,4 +565,3 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
   );
 }
 
-    
