@@ -13,8 +13,8 @@ import {
   Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, ChevronsRight, HandHelping, Rocket
 } from 'lucide-react';
 import Link from 'next/link';
-import React, { useState, useMemo, useEffect } from 'react';
-import { useActionState, useFormStatus } from 'react-dom'; 
+import React from 'react'; // Changed from import React, { useState, useMemo, useEffect, useActionState }
+import { useFormStatus } from 'react-dom';
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -170,16 +170,16 @@ function EmailSubmitButton() {
 
 export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPremiumLoading }: CareerPathDisplayProps) {
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
-  const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+  const [email, setEmail] = React.useState('');
+  const [activeAccordionItem, setActiveAccordionItem] = React.useState<string | undefined>(undefined);
 
 
   const initialEmailState: EmailFormState = { message: null, success: false };
-  const [emailFormState, dispatchEmailAction] = useActionState(emailResultsAction, initialEmailState);
+  const [emailFormState, dispatchEmailAction] = React.useActionState(emailResultsAction, initialEmailState);
   
-  const resultsTextForEmail = useMemo(() => formatResultsForCopy(data, reportType), [data, reportType]);
+  const resultsTextForEmail = React.useMemo(() => formatResultsForCopy(data, reportType), [data, reportType]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (emailFormState?.message) {
       toast({
         title: emailFormState.success ? 'Success' : 'Error',
@@ -196,7 +196,7 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
   const freeData = reportType === 'free' ? data as CareerPathOutput : null;
 
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (reportType === 'premium' && premiumData?.suggestedCareerPaths?.length) {
       setActiveAccordionItem(`path-${0}`); // Open the first path by default
     } else if (reportType === 'free' && freeData?.suggestedCareerPaths?.length) {
@@ -580,7 +580,8 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         )
       )}
 
-      {reportType === 'free' && (
+       {/* This card appears AFTER the free report content */}
+      {freeData && reportType === 'free' && (
         <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10 mt-12">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-primary flex items-center">
@@ -637,4 +638,3 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     </div>
   );
 }
-
