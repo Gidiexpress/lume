@@ -18,9 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: {
     template: '%s | Lume',
-    default: 'Lume - Your AI Career Navigator',
+    default: 'Lume - AI-Powered Career Guidance for Nigerian Students',
   },
-  description: 'Lume helps you discover personalized career paths using AI. Explore your potential and find the right career for you.',
+  description: 'Discover your ideal career with Lume. Our AI-driven platform provides personalized guidance, skill recommendations, and project ideas to navigate your professional journey in Nigeria.',
   icons: { // Example: Add a favicon if you have one in /public
     // icon: '/favicon.ico', 
   }
@@ -33,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -47,5 +47,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    
