@@ -8,24 +8,23 @@ import type { CareerPathInput, CareerPathOutput } from '@/ai/flows/career-path-g
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
 import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, Navigation, Github, ShieldCheck, Sparkles, AlertTriangle, MessageSquarePlus } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle, ShieldCheck, Github } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-
+import { PaymentModal } from '@/components/skills-navigator/PaymentModal';
 
 export default function CareerPathPage() {
   const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
   const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
-  
   const [freeReportError, setFreeReportError] = useState<string | null>(null);
-  
   const [currentReportType, setCurrentReportType] = useState<'free' | 'premium' | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  
   const { toast } = useToast();
 
   const initialPremiumState: PremiumFormActionState = { message: null, success: false, data: null, reportType: 'premium' };
   const [premiumState, premiumFormAction, isPremiumGenerating] = useActionState(generatePremiumReportAction, initialPremiumState);
-
 
   useEffect(() => {
     document.title = 'Career Path Generator | Lume';
@@ -63,11 +62,9 @@ export default function CareerPathPage() {
     }
   }, [premiumState, toast]);
 
-
   const handleUpgradeToPremiumRequest = () => {
     if (originalFormInput) {
-      console.log("Requesting premium report with input:", originalFormInput);
-      premiumFormAction(originalFormInput);
+      setIsPaymentModalOpen(true); // Open payment modal instead of directly calling action
     } else {
       toast({
         title: 'Error',
@@ -77,12 +74,19 @@ export default function CareerPathPage() {
     }
   };
 
+  const handleConfirmPayment = () => {
+    setIsPaymentModalOpen(false);
+    if (originalFormInput) {
+      premiumFormAction(originalFormInput);
+    }
+  };
+
   const handleReset = () => {
     setCurrentReportData(null);
     setOriginalFormInput(null);
     setFreeReportError(null);
     setCurrentReportType(null);
-    // Reset premiumState if necessary, though useActionState handles its own lifecycle
+    setIsPaymentModalOpen(false);
   };
 
   const error = freeReportError || (!premiumState?.success && premiumState?.message ? premiumState.message : null);
@@ -146,6 +150,15 @@ export default function CareerPathPage() {
               </Button>
             </div>
           </section>
+        )}
+
+        {isPaymentModalOpen && originalFormInput && (
+          <PaymentModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            onConfirmPayment={handleConfirmPayment}
+            isLoading={isPremiumGenerating}
+          />
         )}
       </main>
 

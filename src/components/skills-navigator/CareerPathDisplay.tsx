@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useActionState } from 'react'; 
-import { useFormStatus } from 'react-dom'; // Corrected import for useFormStatus
+import { useActionState, useFormStatus as useReactFormStatus } from 'react'; // Renamed useFormStatus to avoid conflict with react-dom one if any confusion
+import { useFormStatus as useDOMFormStatus } from 'react-dom'; 
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -26,7 +26,7 @@ import { Progress } from '@/components/ui/progress';
 interface CareerPathDisplayProps {
   data: CareerPathOutput | PremiumCareerPathOutput;
   reportType: 'free' | 'premium';
-  onUpgradeToPremium: () => void;
+  onUpgradeToPremium: () => void; // This will now open the payment modal
   isPremiumLoading: boolean;
 }
 
@@ -145,7 +145,7 @@ function formatResultsForCopy(data: CareerPathOutput | PremiumCareerPathOutput, 
 
 
 function EmailSubmitButton() {
-  const { pending } = useFormStatus();
+  const { pending } = useDOMFormStatus(); // Correct import from 'react-dom'
   return (
     <Button type="submit" disabled={pending} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
@@ -239,17 +239,16 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
             <Button 
               size="lg" 
               className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-md" 
-              onClick={onUpgradeToPremium}
+              onClick={onUpgradeToPremium} // This will now trigger the payment modal
               disabled={isPremiumLoading}
             >
-              {isPremiumLoading ? (
+              {isPremiumLoading ? ( // This loader is for when the premium report is actually generating AFTER payment
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
                 <Sparkles className="mr-2 h-5 w-5" />
               )}
-              Upgrade to Premium Report (₦1000 - Simulated)
+              Upgrade to Premium Report (₦1000)
             </Button>
-             <p className="text-xs text-muted-foreground text-center mt-2">(Payment is simulated for this demo and will not be charged)</p>
           </CardContent>
         </Card>
       )}

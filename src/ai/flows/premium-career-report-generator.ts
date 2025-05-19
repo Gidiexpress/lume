@@ -116,7 +116,7 @@ export async function generatePremiumCareerPath(appInput: AppStandardCareerPathI
 
 const premiumReportPrompt = ai.definePrompt({
   name: 'premiumCareerGuidancePrompt',
-  // model: 'groq/llama3-70b-8192', // Removed Groq model specification, will use default Genkit model
+  // model: 'groq/llama3-70b-8192', // Groq model specification removed, will use default Genkit model
   input: {schema: PremiumPromptInputSchema}, 
   output: {schema: PremiumCareerPathOutputSchema}, 
   prompt: `You are a career development expert helping university students and recent graduates in Nigeria transition into job-ready professionals.
@@ -198,14 +198,15 @@ The user is paying for this report, so it must be comprehensive and valuable.
 If 'desiredCareerPath' is "Not specified by user", select the most suitable one based on 'fieldOfStudy' and generate the report for that, clearly stating the chosen path.
 If 'currentSkills' are not provided by the user, the 'probableExistingSkills' should be based on general assumptions for the field of study, and 'criticalSkillsToLearn' should then list all essential skills as needing development.
 `,
-  config: { // These safety settings are for Gemini; Groq may have different or no equivalent settings via Genkit
-    safetySettings: [ 
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-    ],
-  }
+  // Safety settings are more specific to Gemini; Groq may have different defaults or no equivalent settings via Genkit
+  // config: { 
+  //   safetySettings: [ 
+  //     { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  //     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  //     { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  //     { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  //   ],
+  // }
 });
 
 const premiumReportFlow = ai.defineFlow(
@@ -215,10 +216,7 @@ const premiumReportFlow = ai.defineFlow(
     outputSchema: PremiumCareerPathOutputSchema,
   },
   async (promptInput: PremiumPromptInput) => {
-    console.log("Simulating payment verification for premium report for user:", promptInput.name);
-    // Assume payment is successful to proceed
-
-    // The prompt 'premiumReportPrompt' will now use the default Genkit model
+    // Payment verification is now simulated on the frontend before this flow is called.
     const {output} = await premiumReportPrompt(promptInput); 
     if (!output) {
       throw new Error("Premium report generation failed to produce output.");
@@ -226,4 +224,3 @@ const premiumReportFlow = ai.defineFlow(
     return output;
   }
 );
-

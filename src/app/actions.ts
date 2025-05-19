@@ -100,7 +100,7 @@ export async function submitCareerFormAction(
 
 export async function generatePremiumReportAction(
   prevState: FormState | undefined,
-  inputData: CareerPathInput // Accepts CareerPathInput directly (which now includes additionalContext)
+  inputData: CareerPathInput // Accepts CareerPathInput directly
 ): Promise<FormState> {
   const validatedFields = PremiumReportInputSchema.safeParse(inputData);
 
@@ -114,18 +114,9 @@ export async function generatePremiumReportAction(
     };
   }
 
-  console.log("Premium report requested for:", validatedFields.data.email, "- Simulating payment verification...");
-  const paymentSuccessful = true; 
-
-  if (!paymentSuccessful) {
-    return {
-      message: "Payment failed or was not completed. Please try again.",
-      success: false,
-      reportType: 'premium',
-    };
-  }
-
-  console.log("Payment successful (simulated). Generating premium report...");
+  // Payment is now simulated/handled by the frontend before this action is called.
+  // No need for internal payment simulation here.
+  console.log("Premium report requested for:", validatedFields.data.email, "- Assuming payment was handled on client.");
 
   try {
     // Pass validated data (which is of type CareerPathInput) to the premium career path generator
@@ -192,4 +183,3 @@ export async function emailResultsAction(
     success: true,
   };
 }
-    
