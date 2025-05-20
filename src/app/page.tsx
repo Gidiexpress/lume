@@ -9,7 +9,7 @@ import { ModeToggle } from '@/components/mode-toggle';
 
 export const metadata: Metadata = {
   title: 'Lume - AI-Powered Career Guidance for Nigerian Students',
-  description: 'Discover your ideal career with Lume. Our AI-driven platform provides personalized guidance, skill recommendations, and project ideas to navigate your professional journey in Nigeria.',
+  description: 'Discover your ideal career with Lume. Our AI-powered platform provides personalized guidance, skill recommendations, and project ideas to navigate your professional journey in Nigeria.',
 };
 
 export default function LandingPage() {
@@ -139,13 +139,13 @@ export default function LandingPage() {
               <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-md">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary text-primary-foreground text-2xl font-bold mb-6">2</div>
                 <Briefcase className="h-12 w-12 text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Choose Your Report</h3>
-                <p className="text-muted-foreground">Opt for a Free summary or a detailed Premium analysis.</p>
+                <h3 className="text-xl font-semibold mb-2">Get Your Report</h3>
+                <p className="text-muted-foreground">Get a detailed Premium analysis.</p>
               </div>
               <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-md">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary text-primary-foreground text-2xl font-bold mb-6">3</div>
                 <Lightbulb className="h-12 w-12 text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Get Your Guidance</h3>
+                <h3 className="text-xl font-semibold mb-2">Download Your Guidance</h3>
                 <p className="text-muted-foreground">Receive your AI-generated career report and start planning!</p>
               </div>
             </div>
