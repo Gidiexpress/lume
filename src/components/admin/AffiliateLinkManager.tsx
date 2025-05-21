@@ -22,7 +22,7 @@ const initialFormState: Omit<CourseLink, 'title' | 'id'> & { id?: string, title?
 export function AffiliateLinkManager() {
   const [links, setLinks] = useState<CourseLink[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // General loading for fetch/delete
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentLink, setCurrentLink] = useState<CourseLink | null>(null); // For editing
   const [formValues, setFormValues] = useState<Omit<CourseLink, 'id'> & { id?: string }>(initialFormState);
@@ -32,11 +32,11 @@ export function AffiliateLinkManager() {
   const fetchLinks = async () => {
     setIsLoading(true);
     const result = await getAffiliateLinks();
-    if (result.success && result.data) {
-      setLinks(result.data as CourseLink[]);
+    if (result.success && Array.isArray(result.data)) {
+      setLinks(result.data);
     } else {
       toast({ title: 'Error', description: result.message || 'Could not fetch links.', variant: 'destructive' });
-      setLinks([]);
+      setLinks([]); // Ensure links is an array even on error
     }
     setIsLoading(false);
   };
@@ -55,7 +55,7 @@ export function AffiliateLinkManager() {
     if (!isAddPending && addActionState?.message) {
       toast({ title: addActionState.success ? 'Success' : 'Error', description: addActionState.message, variant: addActionState.success ? 'default' : 'destructive' });
       if (addActionState.success) {
-        fetchLinks(); // Re-fetch links to show the new one
+        fetchLinks(); 
         setIsFormOpen(false);
       }
     }
@@ -65,7 +65,7 @@ export function AffiliateLinkManager() {
     if (!isUpdatePending && updateActionState?.message) {
       toast({ title: updateActionState.success ? 'Success' : 'Error', description: updateActionState.message, variant: updateActionState.success ? 'default' : 'destructive'});
       if (updateActionState.success) {
-        fetchLinks(); // Re-fetch links to show changes
+        fetchLinks(); 
         setIsFormOpen(false);
       }
     }
@@ -80,14 +80,14 @@ export function AffiliateLinkManager() {
   const handleFormSubmit = () => {
     const formData = new FormData();
     if (currentLink?.id) formData.append('id', currentLink.id);
-    formData.append('title', formValues.title || '');
+    formData.append('title', formValues.title || ''); // Ensure title is always present
     formData.append('affiliateUrl', formValues.affiliateUrl);
     if (formValues.displayText) formData.append('displayText', formValues.displayText);
 
     startTransition(() => {
-        if (currentLink) { // Editing
+        if (currentLink) { 
             updateFormAction(formData);
-        } else { // Adding
+        } else { 
             addFormAction(formData);
         }
     });
@@ -101,11 +101,11 @@ export function AffiliateLinkManager() {
 
   const handleDelete = async (linkId: string) => {
     if (!confirm('Are you sure you want to delete this link?')) return;
-    setIsLoading(true); // Use general loading for delete operation for now
+    setIsLoading(true); 
     const result = await deleteAffiliateLink(linkId);
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     if (result.success) {
-      fetchLinks(); // Re-fetch links
+      fetchLinks(); 
     }
     setIsLoading(false);
   };
@@ -138,12 +138,12 @@ export function AffiliateLinkManager() {
             </CardTitle>
             <CardDescription>Manage partner course links stored in Supabase.</CardDescription>
           </div>
-          <Button onClick={openAddForm} disabled={isActionPending}>
+          <Button onClick={openAddForm} disabled={isActionPending || isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
           </Button>
         </CardHeader>
         <CardContent>
-          {isLoading && !links.length ? (
+          {isLoading && links.length === 0 ? ( // Show loading only if links are empty initially
             <div className="flex items-center justify-center py-4">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading links...
             </div>
@@ -186,7 +186,7 @@ export function AffiliateLinkManager() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if (!isActionPending) setIsFormOpen(isOpen); }}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg"> {/* Increased width */}
           <DialogHeader>
             <DialogTitle>{currentLink ? 'Edit' : 'Add New'} Affiliate Link</DialogTitle>
           </DialogHeader>
@@ -238,9 +238,9 @@ export function AffiliateLinkManager() {
         </CardHeader>
         <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-1">
           <ul className="list-disc list-inside pl-4">
-            <li>Ensure your Supabase project URL and Anon Key are correctly set in <code>.env.local</code> and accessible in <code>src/lib/supabase/client.ts</code>.</li>
+            <li>Ensure your Supabase project URL and Anon Key are correctly set in <code>.env.local</code> (e.g., <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible in <code>src/lib/supabase/client.ts</code>.</li>
             <li>Set up Supabase Row Level Security (RLS) rules to restrict write access to the 'affiliateLinks' table to authorized admin users only. This is crucial for production.</li>
-            <li>Client-side read access (for <code>fetchAndCacheAffiliateLinks</code>) also needs to be permitted via RLS policies.</li>
+            <li>Client-side read access for <code>fetchAndCacheAffiliateLinks</code> (used in report display) also needs to be permitted via RLS policies (e.g., <code>SELECT</code> for authenticated users or public).</li>
             <li>Current implementation uses the 'title' as a unique key for matching. Editing the title of existing links is disabled to simplify this prototype.</li>
             <li>Performance stats (clicks/conversions) require further analytics setup and backend integration.</li>
           </ul>
@@ -250,3 +250,4 @@ export function AffiliateLinkManager() {
   );
 }
 
+    
