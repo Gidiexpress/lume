@@ -136,7 +136,7 @@ export function AffiliateLinkManager() {
               <Link2Icon className="mr-2 h-6 w-6 text-primary" />
               Affiliate Links & Resources
             </CardTitle>
-            <CardDescription>Manage partner course links stored in Firestore.</CardDescription>
+            <CardDescription>Manage partner course links stored in Supabase.</CardDescription>
           </div>
           <Button onClick={openAddForm} disabled={isActionPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
@@ -238,8 +238,9 @@ export function AffiliateLinkManager() {
         </CardHeader>
         <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-1">
           <ul className="list-disc list-inside pl-4">
-            <li>Ensure your Firebase project is correctly configured in <code>src/lib/firebase/config.ts</code>.</li>
-            <li>Set up Firebase Firestore security rules to restrict write access to this 'affiliateLinks' collection to authenticated admin users only. This is crucial for production.</li>
+            <li>Ensure your Supabase project URL and Anon Key are correctly set in <code>.env.local</code> and accessible in <code>src/lib/supabase/client.ts</code>.</li>
+            <li>Set up Supabase Row Level Security (RLS) rules to restrict write access to the 'affiliateLinks' table to authorized admin users only. This is crucial for production.</li>
+            <li>Client-side read access (for <code>fetchAndCacheAffiliateLinks</code>) also needs to be permitted via RLS policies.</li>
             <li>Current implementation uses the 'title' as a unique key for matching. Editing the title of existing links is disabled to simplify this prototype.</li>
             <li>Performance stats (clicks/conversions) require further analytics setup and backend integration.</li>
           </ul>
@@ -248,3 +249,4 @@ export function AffiliateLinkManager() {
     </div>
   );
 }
+
