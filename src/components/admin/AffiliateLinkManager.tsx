@@ -35,7 +35,16 @@ export function AffiliateLinkManager() {
     if (result.success && Array.isArray(result.data)) {
       setLinks(result.data);
     } else {
-      toast({ title: 'Error', description: result.message || 'Could not fetch links.', variant: 'destructive' });
+      if (result.message && (result.message.includes("relation") && result.message.includes("does not exist"))) {
+        toast({ 
+          title: 'Database Table Missing', 
+          description: `The 'affiliateLinks' table was not found in your Supabase database. Please create it and ensure RLS policies are set. Refer to the setup instructions.`, 
+          variant: 'destructive', // Keep as destructive to indicate a critical setup issue
+          duration: 10000 // Longer duration for important messages
+        });
+      } else {
+        toast({ title: 'Error Fetching Links', description: result.message || 'Could not fetch affiliate links.', variant: 'destructive' });
+      }
       setLinks([]); // Ensure links is an array even on error
     }
     setIsLoading(false);
@@ -143,12 +152,12 @@ export function AffiliateLinkManager() {
           </Button>
         </CardHeader>
         <CardContent>
-          {isLoading && links.length === 0 ? ( // Show loading only if links are empty initially
+          {isLoading && links.length === 0 ? ( 
             <div className="flex items-center justify-center py-4">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading links...
             </div>
           ) : links.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet.</p>
+            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. If you see a 'Database Table Missing' error toast, please ensure the 'affiliateLinks' table is created in Supabase.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -186,7 +195,7 @@ export function AffiliateLinkManager() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if (!isActionPending) setIsFormOpen(isOpen); }}>
-        <DialogContent className="sm:max-w-lg"> {/* Increased width */}
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{currentLink ? 'Edit' : 'Add New'} Affiliate Link</DialogTitle>
           </DialogHeader>
@@ -233,14 +242,15 @@ export function AffiliateLinkManager() {
       <Card className="bg-blue-50 border-blue-200 shadow-md dark:bg-blue-900/30 dark:border-blue-700">
         <CardHeader>
           <CardTitle className="text-blue-700 dark:text-blue-300 text-sm flex items-center">
-            <Info className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" /> Important Considerations
+            <Info className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" /> Important Supabase Setup
             </CardTitle>
         </CardHeader>
-        <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-1">
-          <ul className="list-disc list-inside pl-4">
+        <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-2">
+          <ul className="list-disc list-inside pl-4 space-y-1">
+            <li><strong>Table Creation:</strong> If you see a 'Database Table Missing' error toast (or a message like "relation 'public.affiliateLinks' does not exist"), you **must create the `affiliateLinks` table** in your Supabase project's `public` schema. It should include columns like `id` (uuid, PK), `title` (text), `affiliateUrl` (text), and `displayText` (text, nullable).</li>
             <li>Ensure your Supabase project URL and Anon Key are correctly set in <code>.env.local</code> (e.g., <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible in <code>src/lib/supabase/client.ts</code>.</li>
             <li>Set up Supabase Row Level Security (RLS) rules to restrict write access to the 'affiliateLinks' table to authorized admin users only. This is crucial for production.</li>
-            <li>Client-side read access for <code>fetchAndCacheAffiliateLinks</code> (used in report display) also needs to be permitted via RLS policies (e.g., <code>SELECT</code> for authenticated users or public).</li>
+            <li>Client-side read access for <code>fetchAndCacheAffiliateLinks</code> (used in report display) also needs to be permitted via RLS policies (e.g., <code>SELECT</code> for authenticated users or public, depending on your security model).</li>
             <li>Current implementation uses the 'title' as a unique key for matching. Editing the title of existing links is disabled to simplify this prototype.</li>
             <li>Performance stats (clicks/conversions) require further analytics setup and backend integration.</li>
           </ul>
@@ -250,4 +260,3 @@ export function AffiliateLinkManager() {
   );
 }
 
-    
