@@ -1,9 +1,11 @@
 
 'use server';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase/client'; // Import Supabase client
+import { supabase as supabaseClient } from '@/lib/supabase/client'; // Standard client for RLS-protected actions if needed
+import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import type { CourseLink } from '@/lib/affiliateLinks';
-import type { AuthError, PostgrestError } from '@supabase/supabase-js';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 // Zod Schema for validating affiliate links
 const AffiliateLinkSchema = z.object({
@@ -23,7 +25,9 @@ export interface AdminActionState {
 // Fetch all affiliate links from Supabase
 export async function getAffiliateLinks(): Promise<AdminActionState> {
   try {
-    const { data, error } = await supabase
+    // For public reads or RLS-protected reads not requiring specific user context for the query itself,
+    // the standard client can be okay, assuming RLS policies are set up correctly.
+    const { data, error } = await supabaseClient
       .from('affiliateLinks') 
       .select('*')
       .order('title', { ascending: true });
@@ -55,8 +59,11 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
   const { title, affiliateUrl, displayText } = validatedFields.data;
 
   try {
-    // Check if title already exists
-    const { data: existingLink, error: selectError } = await supabase
+    // Write operations like insert/update/delete should ideally be secured by RLS
+    // ensuring only authorized users (admins) can perform them.
+    // The client used (standard or serverActionClient) matters less for the DB operation itself
+    // if RLS is correctly configured for the authenticated user's role.
+    const { data: existingLink, error: selectError } = await supabaseClient
       .from('affiliateLinks')
       .select('title')
       .eq('title', title)
@@ -69,7 +76,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
       return { success: false, message: `An affiliate link with the title "${title}" already exists.` };
     }
 
-    const { data: newLink, error: insertError } = await supabase
+    const { data: newLink, error: insertError } = await supabaseClient
       .from('affiliateLinks')
       .insert([{ title, affiliateUrl, displayText: displayText || null }]) 
       .select()
@@ -105,12 +112,12 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     };
   }
   
-  const { affiliateUrl, displayText } = validatedFields.data; // Title is not updated here
+  const { affiliateUrl, displayText } = validatedFields.data; 
   const updatedData: Partial<CourseLink> = { affiliateUrl, displayText: displayText || null };
 
 
   try {
-    const { data: updatedLink, error } = await supabase
+    const { data: updatedLink, error } = await supabaseClient
       .from('affiliateLinks')
       .update(updatedData)
       .eq('id', id)
@@ -133,7 +140,7 @@ export async function deleteAffiliateLink(id: string): Promise<AdminActionState>
     return { success: false, message: "Link ID is missing." };
   }
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('affiliateLinks')
       .delete()
       .eq('id', id);
@@ -141,7 +148,7 @@ export async function deleteAffiliateLink(id: string): Promise<AdminActionState>
     if (error) throw error;
     return { success: true, message: 'Affiliate link deleted successfully.' };
   } catch (error: any) {
-    console.error("Error deleting affiliate link from Supabase:", error);
+    console.error("Error deleting affiliate link in Supabase:", error);
     return { success: false, message: error.message || 'Failed to delete affiliate link.' };
   }
 }
@@ -159,10 +166,13 @@ export interface UserProfileState {
 }
 
 export async function updateUserProfile(prevState: UserProfileState | undefined, formData: FormData): Promise<UserProfileState> {
-  // 1. Get authenticated user
+  const supabase = createServerActionClient({ cookies }); // Create server-side client
+
+  // 1. Get authenticated user using the server-side client
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
+    console.error('Auth error in updateUserProfile:', authError);
     return { success: false, message: 'Authentication error: Could not get user.' };
   }
 
@@ -183,21 +193,22 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
 
   // 3. Update profile in Supabase 'profiles' table
   try {
+    // For this DB operation, RLS on 'profiles' table will enforce permissions based on the authenticated user.
+    // So using the serverActionClient here is fine, or even the standard client if RLS is robust.
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ 
         full_name: fullName,
-        updated_at: new Date().toISOString(), // Explicitly set updated_at
+        updated_at: new Date().toISOString(), 
       })
       .eq('id', user.id);
 
     if (updateError) {
       console.error("Error updating profile in Supabase:", updateError);
       let message = updateError.message || 'Failed to update profile.';
-      // Check for specific RLS violation error (code 42501 for permission denied)
       if (updateError.code === '42501') {
           message = 'Permission denied. Check RLS policies on the profiles table for update operations.';
-      } else if (updateError.code === '23503') { // foreign_key_violation (should not happen if id is correct)
+      } else if (updateError.code === '23503') { 
           message = 'Error: User ID not found for profile update.';
       }
       return { success: false, message };
@@ -209,6 +220,3 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
     return { success: false, message: 'An unexpected error occurred while updating profile.' };
   }
 }
-
-
-    
