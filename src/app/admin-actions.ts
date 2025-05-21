@@ -32,6 +32,8 @@ export interface UserProfileState {
 export async function getAffiliateLinks(): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
   try {
+    // No explicit auth check here as affiliate links might be public readable
+    // depending on RLS. If fetching needs admin rights, add auth check like below.
     const { data, error } = await supabase
       .from('affiliateLinks')
       .select('*')
@@ -55,9 +57,9 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
     console.error('Supabase auth.getUser() error in addAffiliateLink:', authError);
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
-  if (!userData || !userData.user) {
-    console.error('No user session found in addAffiliateLink server action.');
-    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  if (!userData?.user) {
+    console.error('No user session found in addAffiliateLink server action. AuthError (if any):', authError);
+    return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
@@ -127,9 +129,9 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     console.error('Supabase auth.getUser() error in updateAffiliateLink:', authError);
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
-  if (!userData || !userData.user) {
-    console.error('No user session found in updateAffiliateLink server action.');
-    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  if (!userData?.user) {
+    console.error('No user session found in updateAffiliateLink server action. AuthError (if any):', authError);
+    return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
@@ -164,6 +166,7 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
   }
 
   const { affiliateUrl, displayText } = validatedFields.data;
+  // Title cannot be updated via this form, so it's not included in updatedData.
   const updatedData: Partial<Omit<CourseLink, 'id' | 'title'>> = { affiliateUrl, displayText: displayText || null };
 
 
@@ -197,9 +200,9 @@ export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminAct
     console.error('Supabase auth.getUser() error in deleteAffiliateLink:', authError);
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
-  if (!userData || !userData.user) {
-    console.error('No user session found in deleteAffiliateLink server action.');
-    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  if (!userData?.user) {
+    console.error('No user session found in deleteAffiliateLink server action. AuthError (if any):', authError);
+    return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
@@ -246,9 +249,9 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
     console.error('Supabase auth.getUser() error in updateUserProfile:', authError);
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
-  if (!userData || !userData.user) {
-    console.error('No user session found in updateUserProfile server action.');
-    return { success: false, message: "Authentication error: Could not get user. Please log in again." };
+  if (!userData?.user) {
+    console.error('No user session found in updateUserProfile server action. AuthError (if any):', authError);
+    return { success: false, message: "Authentication error: Auth session missing!. Please log in again." };
   }
   const user = userData.user;
 
@@ -266,6 +269,8 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
   }
   const { fullName } = validatedFields.data;
   try {
+    // Note: RLS policies on 'profiles' table must allow the user to update their own 'full_name' and 'updated_at'.
+    // It should ideally prevent them from updating their 'role'.
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: fullName, updated_at: new Date().toISOString() })
