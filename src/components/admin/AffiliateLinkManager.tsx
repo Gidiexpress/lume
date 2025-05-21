@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { CourseLink } from '@/lib/affiliateLinks';
 import { getAffiliateLinks, addAffiliateLink, updateAffiliateLink, deleteAffiliateLink, type AdminActionState } from '@/app/admin-actions';
 
-const initialFormState: Omit<CourseLink, 'title' | 'id'> & { id?: string, title?: string } = {
+const initialFormValues: Omit<CourseLink, 'id'> & { id?: string; title?: string } = {
     title: '',
     affiliateUrl: '',
     displayText: '',
@@ -25,7 +25,7 @@ export function AffiliateLinkManager() {
   const [isLoading, setIsLoading] = useState(true); // General loading for fetch/delete
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentLink, setCurrentLink] = useState<CourseLink | null>(null); // For editing
-  const [formValues, setFormValues] = useState<Omit<CourseLink, 'id'> & { id?: string }>(initialFormState);
+  const [formValues, setFormValues] = useState<Omit<CourseLink, 'id'> & { id?: string; title?: string }>(initialFormValues);
   
   const { toast } = useToast();
 
@@ -38,14 +38,14 @@ export function AffiliateLinkManager() {
       if (result.message && (result.message.includes("relation") && result.message.includes("does not exist"))) {
         toast({ 
           title: 'Database Table Missing', 
-          description: `The 'affiliateLinks' table was not found in your Supabase database. Please create it and ensure RLS policies are set. Refer to the setup instructions.`, 
-          variant: 'destructive', // Keep as destructive to indicate a critical setup issue
-          duration: 10000 // Longer duration for important messages
+          description: `The 'affiliateLinks' table was not found in your Supabase database. Please create it using the SQL schema provided in the 'Important Supabase Setup' card below and ensure RLS policies are set.`, 
+          variant: 'destructive',
+          duration: 15000 
         });
       } else {
         toast({ title: 'Error Fetching Links', description: result.message || 'Could not fetch affiliate links.', variant: 'destructive' });
       }
-      setLinks([]); // Ensure links is an array even on error
+      setLinks([]); 
     }
     setIsLoading(false);
   };
@@ -56,13 +56,13 @@ export function AffiliateLinkManager() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  const [addActionState, addFormAction, isAddPending] = useActionState(addAffiliateLink, {success: false, message: null});
-  const [updateActionState, updateFormAction, isUpdatePending] = useActionState(updateAffiliateLink, {success: false, message: null});
+  const [addActionState, addFormAction, isAddPending] = useActionState(addAffiliateLink, {success: false, message: null, issues: []});
+  const [updateActionState, updateFormAction, isUpdatePending] = useActionState(updateAffiliateLink, {success: false, message: null, issues: []});
 
 
   useEffect(() => {
     if (!isAddPending && addActionState?.message) {
-      toast({ title: addActionState.success ? 'Success' : 'Error', description: addActionState.message, variant: addActionState.success ? 'default' : 'destructive' });
+      toast({ title: addActionState.success ? 'Success' : 'Error Adding Link', description: addActionState.message, variant: addActionState.success ? 'default' : 'destructive' });
       if (addActionState.success) {
         fetchLinks(); 
         setIsFormOpen(false);
@@ -72,7 +72,7 @@ export function AffiliateLinkManager() {
 
   useEffect(() => {
     if (!isUpdatePending && updateActionState?.message) {
-      toast({ title: updateActionState.success ? 'Success' : 'Error', description: updateActionState.message, variant: updateActionState.success ? 'default' : 'destructive'});
+      toast({ title: updateActionState.success ? 'Success' : 'Error Updating Link', description: updateActionState.message, variant: updateActionState.success ? 'default' : 'destructive'});
       if (updateActionState.success) {
         fetchLinks(); 
         setIsFormOpen(false);
@@ -89,7 +89,10 @@ export function AffiliateLinkManager() {
   const handleFormSubmit = () => {
     const formData = new FormData();
     if (currentLink?.id) formData.append('id', currentLink.id);
-    formData.append('title', formValues.title || ''); // Ensure title is always present
+    // Title is only appended if it's a new link or if it's being edited (though editing title is disabled in form)
+    if (!currentLink || formValues.title) {
+      formData.append('title', formValues.title || ''); 
+    }
     formData.append('affiliateUrl', formValues.affiliateUrl);
     if (formValues.displayText) formData.append('displayText', formValues.displayText);
 
@@ -121,7 +124,7 @@ export function AffiliateLinkManager() {
 
   const openAddForm = () => {
     setCurrentLink(null);
-    setFormValues(initialFormState);
+    setFormValues(initialFormValues);
     setIsFormOpen(true);
   };
 
@@ -157,7 +160,7 @@ export function AffiliateLinkManager() {
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading links...
             </div>
           ) : links.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. If you see a 'Database Table Missing' error toast, please ensure the 'affiliateLinks' table is created in Supabase.</p>
+            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. If you see a 'Database Table Missing' error toast, please ensure the 'affiliateLinks' table is created in Supabase as per the setup instructions below.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -200,31 +203,71 @@ export function AffiliateLinkManager() {
             <DialogTitle>{currentLink ? 'Edit' : 'Add New'} Affiliate Link</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(); }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="title" className="text-right">Title*</Label>
-                <Input id="title" name="title" value={formValues.title || ''} onChange={handleInputChange} className="col-span-3" placeholder="Course title to match" required disabled={isActionPending || !!currentLink} />
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="title">Title (Course title to match)*</Label>
+                <Input 
+                  id="title" 
+                  name="title" 
+                  value={formValues.title || ''} 
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Introduction to Python" 
+                  required 
+                  disabled={isActionPending || !!currentLink} 
+                  className="mt-1"
+                />
+                {currentLink && <p className="text-xs text-muted-foreground mt-1">Title (matching key) cannot be changed after creation to maintain data integrity. To change a title, please delete and re-add the link.</p>}
               </div>
-              {currentLink && <p className="col-span-4 text-xs text-muted-foreground text-center -mt-2">Title (matching key) is unique and cannot be changed after creation to maintain data integrity. To change a title, delete and re-add.</p>}
               
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="affiliateUrl" className="text-right">URL*</Label>
-                <Input id="affiliateUrl" name="affiliateUrl" value={formValues.affiliateUrl} onChange={handleInputChange} className="col-span-3" type="url" placeholder="https://partner.com/course?ref=lume" required disabled={isActionPending} />
+              <div>
+                <Label htmlFor="affiliateUrl">Affiliate URL*</Label>
+                <Input 
+                  id="affiliateUrl" 
+                  name="affiliateUrl" 
+                  value={formValues.affiliateUrl} 
+                  onChange={handleInputChange} 
+                  type="url" 
+                  placeholder="https://partner.com/course?ref=lume" 
+                  required 
+                  disabled={isActionPending}
+                  className="mt-1"
+                />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="displayText" className="text-right">Display Text</Label>
-                <Input id="displayText" name="displayText" value={formValues.displayText || ''} onChange={handleInputChange} className="col-span-3" placeholder="e.g., Special Course Offer (Optional)" disabled={isActionPending} />
+
+              <div>
+                <Label htmlFor="displayText">Display Text (Optional)</Label>
+                <Input 
+                  id="displayText" 
+                  name="displayText" 
+                  value={formValues.displayText || ''} 
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Special Course Offer" 
+                  disabled={isActionPending}
+                  className="mt-1"
+                />
               </div>
-               { (addActionState && !addActionState.success && !isAddPending) &&
-                <p className="col-span-4 text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
-                    <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {addActionState.message}
-                </p>
-              }
-              { (updateActionState && !updateActionState.success && !isUpdatePending) &&
-                <p className="col-span-4 text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
-                    <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {updateActionState.message}
-                </p>
-              }
+              
+              {/* Error Display for Add Action */}
+              { addActionState?.issues && addActionState.issues.length > 0 && !isAddPending && (
+                <div className="space-y-2 mt-2">
+                  {addActionState.issues.map((issue, index) => (
+                    <p key={`add-err-${index}`} className="text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
+                      <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {issue}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Error Display for Update Action */}
+              { updateActionState?.issues && updateActionState.issues.length > 0 && !isUpdatePending && (
+                 <div className="space-y-2 mt-2">
+                  {updateActionState.issues.map((issue, index) => (
+                    <p key={`upd-err-${index}`} className="text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
+                      <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {issue}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -247,16 +290,52 @@ export function AffiliateLinkManager() {
         </CardHeader>
         <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-2">
           <ul className="list-disc list-inside pl-4 space-y-1">
-            <li><strong>Table Creation:</strong> If you see a 'Database Table Missing' error toast (or a message like "relation 'public.affiliateLinks' does not exist"), you **must create the `affiliateLinks` table** in your Supabase project's `public` schema. It should include columns like `id` (uuid, PK), `title` (text), `affiliateUrl` (text), and `displayText` (text, nullable).</li>
+            <li><strong>Table Creation:</strong> If you see a 'Database Table Missing' error toast (or a message like "relation 'public.affiliateLinks' does not exist"), you **must create the `affiliateLinks` table** in your Supabase project's `public` schema.
+              SQL to create table:
+              <pre className="mt-1 mb-1 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">{
+`CREATE TABLE public.affiliateLinks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL UNIQUE,
+  "affiliateUrl" TEXT NOT NULL,
+  "displayText" TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+COMMENT ON TABLE public.affiliateLinks IS 'Stores affiliate links for courses and resources.';
+ALTER TABLE public.affiliateLinks ENABLE ROW LEVEL SECURITY;`
+              }</pre>
+            </li>
             <li>Ensure your Supabase project URL and Anon Key are correctly set in <code>.env.local</code> (e.g., <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible in <code>src/lib/supabase/client.ts</code>.</li>
-            <li>Set up Supabase Row Level Security (RLS) rules to restrict write access to the 'affiliateLinks' table to authorized admin users only. This is crucial for production.</li>
-            <li>Client-side read access for <code>fetchAndCacheAffiliateLinks</code> (used in report display) also needs to be permitted via RLS policies (e.g., <code>SELECT</code> for authenticated users or public, depending on your security model).</li>
-            <li>Current implementation uses the 'title' as a unique key for matching. Editing the title of existing links is disabled to simplify this prototype.</li>
-            <li>Performance stats (clicks/conversions) require further analytics setup and backend integration.</li>
+            <li>Set up Supabase Row Level Security (RLS) rules. For admin actions (add/edit/delete), you'll need policies that allow these operations only for authenticated users with an admin role (e.g., checking a `role` column in a `profiles` table). For example:
+              <pre className="mt-1 mb-1 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">{
+`-- Example RLS: Allow admins to manage affiliate links
+CREATE POLICY "Admins can manage affiliate links"
+ON public.affiliateLinks
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+  )
+);
+
+-- Allow public read access if links are fetched client-side for display in reports
+CREATE POLICY "Allow public read access to affiliate links"
+ON public.affiliateLinks
+FOR SELECT
+TO public -- or 'authenticated'
+USING (true);`
+              }</pre>
+            </li>
+            <li>Client-side read access for `fetchAndCacheAffiliateLinks` (used in report display) requires the "Allow public read access" RLS policy.</li>
+            <li>Current implementation uses the 'title' as a unique key for matching. Editing the title of existing links is disabled in the form to simplify this prototype.</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
-
