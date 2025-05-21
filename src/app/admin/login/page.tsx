@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/lib/supabase/client'; // Import Supabase client
-import { Loader2, LogIn, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
+import { Loader2, LogIn, AlertTriangle, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminLoginPage() {
@@ -25,15 +25,22 @@ export default function AdminLoginPage() {
     if (authError === 'unauthorized') {
       setError('Access Denied: You are not authorized to access the admin dashboard.');
     } else if (authError === 'role_check_failed') {
-      setError('Error: Could not verify admin privileges. Please contact support.');
+      setError('Authorization Error: Could not verify admin privileges. Please contact support.');
     }
-  }, [searchParams]);
+     // Clear error from URL
+    if (authError) {
+        const newPath = router.pathname; // Or window.location.pathname if router.pathname isn't available/correct
+        router.replace(newPath, undefined); // Using undefined for shallow routing in App Router
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // router is stable, pathname not needed if clearing searchParams
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        // User is logged in. Redirect to admin page.
-        // The /admin page will handle its own authorization logic (e.g., checking roles).
+        // User is logged in. Attempt to redirect to admin page.
+        // The /admin page will handle its own authorization logic (role check).
+        // If the role check on /admin fails, it will redirect back here with an error.
         router.replace('/admin');
       } else {
         setIsCheckingAuth(false);
@@ -78,14 +85,14 @@ export default function AdminLoginPage() {
       }
 
       if (data.user) {
-        // Login successful, redirect to admin page.
-        // The /admin page will be responsible for further role checks.
+        // Login successful from Supabase Auth perspective.
+        // Redirect to /admin which will then perform the role check.
         router.replace('/admin');
       } else {
+         // This case should ideally be covered by signInError
          setError('Login failed. Please try again.');
       }
     } catch (err: any) {
-      // Catch any unexpected errors
       setError(err.message || 'An unexpected error occurred during login.');
       console.error("Unexpected Login error:", err);
     } finally {
@@ -106,11 +113,11 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold flex items-center justify-center">
-            <LogIn className="mr-2 h-6 w-6 text-primary" />
+            <ShieldAlert className="mr-2 h-6 w-6 text-primary" /> {/* Changed Icon */}
             Lume Admin Login
           </CardTitle>
           <CardDescription>
-            Access to the Lume administration panel. (Using Supabase Auth)
+            Access to the Lume administration panel.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
@@ -162,3 +169,5 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
+    
