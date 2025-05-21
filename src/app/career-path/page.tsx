@@ -54,14 +54,13 @@ export default function CareerPathPage() {
           title: 'Premium Report Generated!',
           description: premiumState.message,
         });
-        setIsPaymentModalOpen(false); // Close payment modal on successful premium generation
+        // Payment modal is now closed before generation starts
       } else if (!premiumState.success) {
         toast({
           title: 'Premium Generation Failed',
           description: premiumState.message || "Could not generate premium report.",
           variant: 'destructive',
         });
-        // Keep payment modal open or handle error state for modal as needed
       }
     }
   }, [premiumState, toast, isPremiumGenerating]);
@@ -81,11 +80,10 @@ export default function CareerPathPage() {
   // This function is called by PaymentModal after Paystack's onSuccess
   const handleConfirmPaymentAndGenerateReport = () => {
     if (originalFormInput) {
+      setIsPaymentModalOpen(false); // Close Lume payment modal immediately
       startTransition(() => {
         premiumFormAction(originalFormInput); // Start AI call
       });
-      // The modal will remain open and show its loading state (isPremiumGenerating)
-      // It will be closed by the useEffect hook when premiumState.success is true.
     }
   };
 
@@ -142,7 +140,7 @@ export default function CareerPathPage() {
           data={currentReportData} 
           reportType={currentReportType}
           onUpgradeToPremium={handleUpgradeToPremiumRequest}
-          isPremiumLoading={isPremiumGenerating} // This is for the button state inside CareerPathDisplay
+          isPremiumLoading={isPremiumGenerating}
         />
         <div className="mt-8 text-center">
           <Button onClick={handleReset} variant="outline" size="lg">
@@ -194,8 +192,8 @@ export default function CareerPathPage() {
           <PaymentModal
             isOpen={isPaymentModalOpen}
             onClose={() => setIsPaymentModalOpen(false)}
-            onConfirmPayment={handleConfirmPaymentAndGenerateReport} // Renamed prop for clarity
-            isLoading={isPremiumGenerating} // This will keep Paystack button disabled if AI is already working
+            onConfirmPayment={handleConfirmPaymentAndGenerateReport} 
+            isLoading={isPremiumGenerating} 
             userEmail={originalFormInput.email}
           />
         )}
