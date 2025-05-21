@@ -49,20 +49,29 @@ export async function getAffiliateLinks(): Promise<AdminActionState> {
 export async function addAffiliateLink(prevState: AdminActionState | undefined, formData: FormData): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
 
-  // Check for admin user (example of how you might protect server actions)
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, message: 'Authentication required. Please log in.' };
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error('Supabase auth.getUser() error in addAffiliateLink:', authError);
+    return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
-  // Further check if user is admin (requires role setup in Supabase)
+  if (!userData || !userData.user) {
+    console.error('No user session found in addAffiliateLink server action.');
+    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  }
+  const user = userData.user;
+
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profileError || !profile || profile.role !== 'admin') {
+  if (profileError) {
+    console.error('Error fetching profile in addAffiliateLink:', profileError);
+    return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
+  }
+  if (!profile || profile.role !== 'admin') {
     return { success: false, message: 'Authorization failed. Admin privileges required.' };
   }
 
 
   const validatedFields = AffiliateLinkSchema.safeParse({
-    // id is not part of add form, title is key
     title: formData.get('title'),
     affiliateUrl: formData.get('affiliateUrl'),
     displayText: formData.get('displayText') || undefined,
@@ -85,7 +94,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
       .eq('title', title)
       .maybeSingle();
 
-    if (selectError && selectError.code !== 'PGRST116') { // PGRST116: Searched for one row, but found 0
+    if (selectError && selectError.code !== 'PGRST116') { 
         throw selectError;
     }
     if (existingLink) {
@@ -113,10 +122,25 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
 export async function updateAffiliateLink(prevState: AdminActionState | undefined, formData: FormData): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, message: 'Authentication required.' };
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('Supabase auth.getUser() error in updateAffiliateLink:', authError);
+    return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
+  }
+  if (!userData || !userData.user) {
+    console.error('No user session found in updateAffiliateLink server action.');
+    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  }
+  const user = userData.user;
+
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profileError || !profile || profile.role !== 'admin') return { success: false, message: 'Admin privileges required.' };
+  if (profileError) {
+    console.error('Error fetching profile in updateAffiliateLink:', profileError);
+    return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
+  }
+  if (!profile || profile.role !== 'admin') {
+    return { success: false, message: 'Authorization failed. Admin privileges required.' };
+  }
 
 
   const id = formData.get('id') as string;
@@ -125,8 +149,8 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
   }
 
   const validatedFields = AffiliateLinkSchema.safeParse({
-    id: id, // ID is passed for validation context but not directly updated by user
-    title: formData.get('title'), // Title is for context, not changed
+    id: id, 
+    title: formData.get('title'), 
     affiliateUrl: formData.get('affiliateUrl'),
     displayText: formData.get('displayText') || undefined,
   });
@@ -139,7 +163,6 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     };
   }
 
-  // Only affiliateUrl and displayText are updatable. Title is the key and cannot be changed via this form.
   const { affiliateUrl, displayText } = validatedFields.data;
   const updatedData: Partial<Omit<CourseLink, 'id' | 'title'>> = { affiliateUrl, displayText: displayText || null };
 
@@ -169,10 +192,25 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
 export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminActionState, 'data'>> {
   const supabase = createServerActionClient({ cookies });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, message: 'Authentication required.' };
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('Supabase auth.getUser() error in deleteAffiliateLink:', authError);
+    return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
+  }
+  if (!userData || !userData.user) {
+    console.error('No user session found in deleteAffiliateLink server action.');
+    return { success: false, message: 'Authentication required. No user session found. Please log in.' };
+  }
+  const user = userData.user;
+
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profileError || !profile || profile.role !== 'admin') return { success: false, message: 'Admin privileges required.' };
+  if (profileError) {
+    console.error('Error fetching profile in deleteAffiliateLink:', profileError);
+    return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
+  }
+  if (!profile || profile.role !== 'admin') {
+    return { success: false, message: 'Authorization failed. Admin privileges required.' };
+  }
 
 
   if (!linkId) {
@@ -202,11 +240,18 @@ const UserProfileSchema = z.object({
 
 export async function updateUserProfile(prevState: UserProfileState | undefined, formData: FormData): Promise<UserProfileState> {
   const supabase = createServerActionClient({ cookies });
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { success: false, message: "Authentication error: Could not get user." };
+  
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('Supabase auth.getUser() error in updateUserProfile:', authError);
+    return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
+  if (!userData || !userData.user) {
+    console.error('No user session found in updateUserProfile server action.');
+    return { success: false, message: "Authentication error: Could not get user. Please log in again." };
+  }
+  const user = userData.user;
+
 
   const validatedFields = UserProfileSchema.safeParse({
     fullName: formData.get('fullName'),
