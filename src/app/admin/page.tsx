@@ -35,21 +35,23 @@ export default function AdminPage() {
 
     try {
       const { data: profile, error: profileError } = await supabase
-        .from('profiles') // Assumes a 'profiles' table
+        .from('profiles') 
         .select('role')
         .eq('id', currentUser.id)
         .single();
 
       if (profileError) {
         console.error('Error fetching user profile:', profileError);
+        let description = 'Could not verify admin privileges. Please ensure your profile is set up correctly.';
         if (profileError.code === 'PGRST116') { // "Searched for one row, but found 0"
-          toast({ title: 'Profile Not Found', description: 'Your user profile was not found. Please contact support.', variant: 'destructive' });
+          description = 'Your user profile was not found. Admin role cannot be verified. Please contact support.';
+          toast({ title: 'Profile Not Found', description, variant: 'destructive' });
         } else {
-          toast({ title: 'Authorization Error', description: 'Could not verify admin privileges.', variant: 'destructive' });
+          toast({ title: 'Authorization Error', description, variant: 'destructive' });
         }
-        await supabase.auth.signOut(); // Sign out if role check fails critically
+        await supabase.auth.signOut(); 
         setIsAuthorized(false);
-        router.replace('/admin/login?error=role_check_failed');
+        router.replace(`/admin/login?error=role_check_failed&message=${encodeURIComponent(description)}`);
         return false;
       }
 
@@ -57,18 +59,20 @@ export default function AdminPage() {
         setIsAuthorized(true);
         return true;
       } else {
-        toast({ title: 'Access Denied', description: 'You are not authorized to access the admin dashboard.', variant: 'destructive' });
+        const description = 'You do not have admin privileges. Access denied.';
+        toast({ title: 'Access Denied', description, variant: 'destructive' });
         await supabase.auth.signOut();
         setIsAuthorized(false);
-        router.replace('/admin/login?error=unauthorized');
+        router.replace(`/admin/login?error=unauthorized&message=${encodeURIComponent(description)}`);
         return false;
       }
     } catch (err) {
       console.error("Unexpected error during role check:", err);
-      toast({ title: 'Authorization Error', description: 'An unexpected error occurred while verifying admin privileges.', variant: 'destructive' });
+      const description = 'An unexpected error occurred while verifying admin privileges.';
+      toast({ title: 'Authorization Error', description, variant: 'destructive' });
       await supabase.auth.signOut();
       setIsAuthorized(false);
-      router.replace('/admin/login?error=role_check_failed');
+      router.replace(`/admin/login?error=role_check_failed&message=${encodeURIComponent(description)}`);
       return false;
     } finally {
       setIsLoading(false);
@@ -191,17 +195,17 @@ export default function AdminPage() {
         <Card className="mb-6 bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
             <CardHeader>
                 <CardTitle className="text-yellow-700 dark:text-yellow-300 text-lg flex items-center">
-                    <AlertTriangle className="h-5 w-5 mr-2" /> Important Setup Note
+                    <AlertTriangle className="h-5 w-5 mr-2" /> Important Supabase Setup Note
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-yellow-600 dark:text-yellow-400 text-sm space-y-2">
                 <p>This admin dashboard attempts to verify admin roles by checking a <code>profiles</code> table in your Supabase database for a <code>role</code> column set to <code>&apos;admin&apos;</code>.</p>
                 <p><strong>For this to work, you MUST:</strong></p>
                 <ol className="list-decimal list-inside pl-4 space-y-1">
-                    <li>Create a <code>profiles</code> table in Supabase.</li>
-                    <li>Ensure it has an <code>id</code> column (UUID, foreign key to <code>auth.users.id</code>) and a <code>role</code> column (TEXT).</li>
-                    <li>For each admin user, add a row in <code>profiles</code> with their user ID and set their <code>role</code> to <code>&apos;admin&apos;</code>.</li>
-                    <li>Set up appropriate Row Level Security (RLS) policies on your Supabase tables to restrict access based on these roles. Client-side checks alone are not sufficient for full security.</li>
+                    <li>Create a <code>profiles</code> table in Supabase with an <code>id</code> (UUID, foreign key to <code>auth.users.id</code>) and a <code>role</code> (TEXT) column.</li>
+                    <li>For each admin user, add a row in <code>profiles</code> with their user ID and set their <code>role</code> to <code>&apos;admin&apos;</code>. (SQL for this provided in chat).</li>
+                    <li>Set up appropriate Row Level Security (RLS) policies on your Supabase <code>profiles</code> table to allow authenticated users to read their own profile. (SQL for this provided in chat).</li>
+                    <li>Client-side checks alone are not sufficient for full security. Secure your Supabase data with RLS and consider server-side protection for admin routes in production.</li>
                 </ol>
             </CardContent>
         </Card>
@@ -252,3 +256,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

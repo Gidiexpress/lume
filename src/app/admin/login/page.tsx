@@ -21,26 +21,30 @@ export default function AdminLoginPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const authError = searchParams.get('error');
-    if (authError === 'unauthorized') {
+    const authErrorType = searchParams.get('error');
+    const authErrorMessage = searchParams.get('message');
+
+    if (authErrorMessage) {
+      setError(decodeURIComponent(authErrorMessage));
+    } else if (authErrorType === 'unauthorized') {
       setError('Access Denied: You are not authorized to access the admin dashboard.');
-    } else if (authError === 'role_check_failed') {
+    } else if (authErrorType === 'role_check_failed') {
       setError('Authorization Error: Could not verify admin privileges. Please contact support.');
     }
-     // Clear error from URL
-    if (authError) {
-        const newPath = router.pathname; // Or window.location.pathname if router.pathname isn't available/correct
-        router.replace(newPath, undefined); // Using undefined for shallow routing in App Router
+    
+    if (authErrorType || authErrorMessage) {
+      // Clear error from URL more reliably for App Router
+      const currentPath = window.location.pathname;
+      router.replace(currentPath, undefined); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]); // router is stable, pathname not needed if clearing searchParams
+  }, [searchParams]); // router is stable and not needed if using window.location for path
 
   useEffect(() => {
-    const { data: authListenerData } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // User is logged in. Attempt to redirect to admin page.
         // The /admin page will handle its own authorization logic (role check).
-        // If the role check on /admin fails, it will redirect back here with an error.
         router.replace('/admin');
       } else {
         setIsCheckingAuth(false);
@@ -59,7 +63,7 @@ export default function AdminLoginPage() {
     checkInitialSession();
 
     return () => {
-      authListenerData.subscription?.unsubscribe();
+      authListener.subscription?.unsubscribe();
     };
   }, [router]);
 
@@ -89,7 +93,6 @@ export default function AdminLoginPage() {
         // Redirect to /admin which will then perform the role check.
         router.replace('/admin');
       } else {
-         // This case should ideally be covered by signInError
          setError('Login failed. Please try again.');
       }
     } catch (err: any) {
@@ -113,7 +116,7 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold flex items-center justify-center">
-            <ShieldAlert className="mr-2 h-6 w-6 text-primary" /> {/* Changed Icon */}
+            <ShieldAlert className="mr-2 h-6 w-6 text-primary" />
             Lume Admin Login
           </CardTitle>
           <CardDescription>
