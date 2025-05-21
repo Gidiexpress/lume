@@ -76,7 +76,7 @@ export default function AdminPage() {
   }, [router, toast]);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListenerData } = supabase.auth.onAuthStateChange(async (event, session) => {
       setIsLoading(true);
       if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
@@ -106,7 +106,7 @@ export default function AdminPage() {
     checkInitialSession();
 
     return () => {
-      authListener?.unsubscribe();
+      authListenerData.subscription?.unsubscribe();
     };
   }, [router, checkAdminRole]);
 
@@ -252,5 +252,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
