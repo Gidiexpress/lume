@@ -1,56 +1,58 @@
 
-import { db } from '@/lib/firebase/config'; 
-import { collection, getDocs } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase/client'; // Import Supabase client
 
 export interface CourseLink {
-  id?: string; 
+  id?: string; // Supabase typically uses string UUIDs for 'id' if auto-generated
   title: string; 
-  affiliateUrl: string;
-  displayText?: string; 
+  affiliateUrl: string; // Ensure this matches your Supabase column name (e.g., affiliate_url)
+  displayText?: string; // Ensure this matches your Supabase column name (e.g., display_text)
 }
 
 let COURSE_AFFILIATE_LINKS_CACHE: CourseLink[] = [];
 let linksFetchedSuccessfully = false;
+let lastFetchTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-// Fetches links from Firestore and populates the cache.
-// Ensures it only fetches once per successful attempt.
+// Fetches links from Supabase and populates the cache.
+// Ensures it only fetches periodically.
 export async function fetchAndCacheAffiliateLinks(): Promise<void> {
-  if (linksFetchedSuccessfully) {
-    // console.log("Using cached affiliate links.");
+  const now = Date.now();
+  if (linksFetchedSuccessfully && (now - lastFetchTimestamp < CACHE_DURATION)) {
+    // console.log("Using cached affiliate links (Supabase).");
     return;
   }
   try {
-    // console.log("Fetching affiliate links from Firestore...");
-    const affiliateLinksCollection = collection(db, 'affiliateLinks');
-    const snapshot = await getDocs(affiliateLinksCollection);
-    COURSE_AFFILIATE_LINKS_CACHE = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CourseLink));
+    // console.log("Fetching affiliate links from Supabase...");
+    const { data, error } = await supabase
+      .from('affiliateLinks') // Ensure this table name matches your Supabase table
+      .select('id, title, affiliateUrl, displayText'); // Specify columns
+
+    if (error) {
+      throw error;
+    }
+    
+    COURSE_AFFILIATE_LINKS_CACHE = data as CourseLink[];
     linksFetchedSuccessfully = true;
-    // console.log("Affiliate links fetched and cached:", COURSE_AFFILIATE_LINKS_CACHE);
+    lastFetchTimestamp = now;
+    // console.log("Affiliate links fetched from Supabase and cached:", COURSE_AFFILIATE_LINKS_CACHE);
   } catch (error) {
-    console.error("Error fetching and caching affiliate links from Firestore:", error);
-    // If fetching fails, linksFetchedSuccessfully remains false, and the cache might be empty or stale.
-    // Allow subsequent attempts to fetch if this one failed.
-    linksFetchedSuccessfully = false; 
+    console.error("Error fetching and caching affiliate links from Supabase:", error);
+    linksFetchedSuccessfully = false; // Allow refetch on next attempt if this one failed
   }
 }
 
 // Synchronously finds an affiliate link in the cache.
-// Assumes fetchAndCacheAffiliateLinks has been called.
+// Assumes fetchAndCacheAffiliateLinks has been called (e.g., in a useEffect).
 export function findAffiliateLinkInCache(courseTitle: string): CourseLink | undefined {
-  if (!courseTitle || !linksFetchedSuccessfully) {
-    // If links haven't been fetched successfully or title is invalid, return undefined.
-    // console.log("Cannot find in cache: Links not fetched or invalid title - ", {courseTitle, linksFetchedSuccessfully});
+  if (!courseTitle) {
     return undefined;
   }
+  // It's okay if linksFetchedSuccessfully is false here; it means the cache might be empty or stale,
+  // and find will just return undefined, which is handled by the caller.
   
   const normalizedCourseTitle = courseTitle.toLowerCase().trim();
   const foundLink = COURSE_AFFILIATE_LINKS_CACHE.find(
     link => link.title.toLowerCase().trim() === normalizedCourseTitle
   );
-  // if (foundLink) console.log("Found link in cache for title:", courseTitle, foundLink);
-  // else console.log("No link found in cache for title:", courseTitle);
   return foundLink;
 }
-
-// This export might not be needed externally if components use the functions above.
-// export { COURSE_AFFILIATE_LINKS_CACHE as MANAGED_AFFILIATE_LINKS_CACHE };
