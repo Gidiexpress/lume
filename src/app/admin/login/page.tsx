@@ -36,7 +36,7 @@ export default function AdminLoginPage() {
   }, [searchParams]); // router is stable, pathname not needed if clearing searchParams
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListenerData } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // User is logged in. Attempt to redirect to admin page.
         // The /admin page will handle its own authorization logic (role check).
@@ -59,7 +59,7 @@ export default function AdminLoginPage() {
     checkInitialSession();
 
     return () => {
-      authListener?.unsubscribe();
+      authListenerData.subscription?.unsubscribe();
     };
   }, [router]);
 
