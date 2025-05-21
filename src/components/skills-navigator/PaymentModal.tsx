@@ -18,9 +18,9 @@ import type { PaystackProps } from 'react-paystack/dist/types';
 
 interface PaymentModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onConfirmPayment: () => void; // This will be called by Paystack's onSuccess
-  isLoading: boolean; // To disable button while AI is working post-payment
+  onClose: () => void; // Callback to close this Lume modal
+  onConfirmPayment: () => void; // Callback after Paystack's client-side success
+  isLoading: boolean; // True if AI report is currently generating post-payment
   userEmail: string | undefined;
 }
 
@@ -30,11 +30,11 @@ const PREMIUM_AMOUNT_KOBO = PREMIUM_AMOUNT_NAIRA * 100;
 export function PaymentModal({ isOpen, onClose, onConfirmPayment, isLoading, userEmail }: PaymentModalProps) {
   const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
 
-  const config: PaystackProps = {
-    reference: new Date().getTime().toString(), // Generate a unique reference
-    email: userEmail || 'guest@example.com', // Fallback email if not provided
+  const paystackConfig: PaystackProps = {
+    reference: new Date().getTime().toString(),
+    email: userEmail || 'guest@example.com',
     amount: PREMIUM_AMOUNT_KOBO, 
-    publicKey: paystackPublicKey || '', // Handled below if not set
+    publicKey: paystackPublicKey || '',
     metadata: {
       custom_fields: [
         {
@@ -46,35 +46,39 @@ export function PaymentModal({ isOpen, onClose, onConfirmPayment, isLoading, use
     }
   };
 
-  const initializePayment = usePaystackPayment(config);
+  const initializePayment = usePaystackPayment(paystackConfig);
 
-  const handlePayment = () => {
+  const handlePaystackPayment = () => {
     if (!paystackPublicKey) {
-      // This case should ideally be handled more gracefully,
-      // e.g., by disabling the button or showing a persistent error.
-      // For now, an alert is shown.
       alert("Paystack Public Key is not configured. Payment cannot proceed.");
       console.error("Paystack Public Key is missing. Please set NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY in your .env file.");
       return;
     }
     initializePayment({
       onSuccess: (transaction) => {
-        // IMPORTANT: In a real app, you MUST verify this transaction on your backend
-        // using Paystack's API and the transaction reference before granting premium access.
         console.log('Paystack transaction successful (client-side):', transaction);
-        onConfirmPayment(); // Trigger AI report generation
-        // The modal will be closed by the parent component's logic after AI generation starts/completes.
+        // IMPORTANT: In a real app, verify transaction on your backend.
+        onConfirmPayment(); // This will trigger AI report generation and potentially close this modal via parent state
       },
       onClose: () => {
+        // This is Paystack's modal closing, not necessarily Lume's modal.
+        // If payment wasn't successful, Lume modal remains open unless user clicks Cancel.
         console.log('Paystack modal closed by user.');
-        // Do not close our Lume modal here if payment was not successful.
-        // The main onClose prop of Dialog handles Lume modal closing.
       },
     });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!isLoading) onClose(); }}>
+    <Dialog 
+      modal={false} // Key change: Disable Radix focus trapping and overlay interaction blocking
+      open={isOpen} 
+      onOpenChange={(openState) => {
+        // Only call onClose if the modal is being closed AND AI is not loading
+        if (!openState && !isLoading) {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="flex items-center text-xl">
@@ -111,7 +115,7 @@ export function PaymentModal({ isOpen, onClose, onConfirmPayment, isLoading, use
         {!paystackPublicKey && (
           <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm flex items-center">
             <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-            <span>Payment gateway is not configured. Please contact support or ensure `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` is set.</span>
+            <span>Payment gateway is not configured. Ensure `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` is set.</span>
           </div>
         )}
 
@@ -122,11 +126,11 @@ export function PaymentModal({ isOpen, onClose, onConfirmPayment, isLoading, use
             </Button>
           </DialogClose>
           <Button 
-            onClick={handlePayment} 
+            onClick={handlePaystackPayment} 
             disabled={isLoading || !paystackPublicKey} 
             className="bg-primary hover:bg-primary/90"
           >
-            {isLoading ? (
+            {isLoading ? ( // This isLoading is for the AI generation part
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
              <CreditCard className="mr-2 h-4 w-4" />

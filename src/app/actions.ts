@@ -63,7 +63,6 @@ export async function submitCareerFormAction(
       message: "Invalid form data. " + issues.join(' '),
       issues,
       success: false,
-      reportType: 'free',
     };
   }
   
