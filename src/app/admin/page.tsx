@@ -41,17 +41,19 @@ export default function AdminPage() {
         .single();
 
       if (profileError) {
-        console.error('Error fetching user profile:', profileError);
+        console.error('Error fetching user profile:', JSON.stringify(profileError, null, 2));
         let description = 'Could not verify admin privileges. Please ensure your profile is set up correctly.';
         if (profileError.code === 'PGRST116') { // "Searched for one row, but found 0"
           description = 'Your user profile was not found. Admin role cannot be verified. Please contact support.';
           toast({ title: 'Profile Not Found', description, variant: 'destructive' });
         } else {
-          toast({ title: 'Authorization Error', description, variant: 'destructive' });
+          toast({ title: 'Authorization Error', description: `${description} (Error: ${profileError.message || 'Unknown Supabase error'})`, variant: 'destructive' });
         }
         await supabase.auth.signOut(); 
         setIsAuthorized(false);
-        router.replace(`/admin/login?error=role_check_failed&message=${encodeURIComponent(description)}`);
+        // Pass a more specific error type if possible, or a generic one if not
+        const errorType = profileError.code === 'PGRST116' ? 'profile_not_found' : 'role_check_failed';
+        router.replace(`/admin/login?error=${errorType}&message=${encodeURIComponent(description)}`);
         return false;
       }
 
@@ -66,8 +68,8 @@ export default function AdminPage() {
         router.replace(`/admin/login?error=unauthorized&message=${encodeURIComponent(description)}`);
         return false;
       }
-    } catch (err) {
-      console.error("Unexpected error during role check:", err);
+    } catch (err: any) {
+      console.error("Unexpected error during role check:", JSON.stringify(err, null, 2));
       const description = 'An unexpected error occurred while verifying admin privileges.';
       toast({ title: 'Authorization Error', description, variant: 'destructive' });
       await supabase.auth.signOut();
@@ -202,11 +204,12 @@ export default function AdminPage() {
                 <p>This admin dashboard attempts to verify admin roles by checking a <code>profiles</code> table in your Supabase database for a <code>role</code> column set to <code>&apos;admin&apos;</code>.</p>
                 <p><strong>For this to work, you MUST:</strong></p>
                 <ol className="list-decimal list-inside pl-4 space-y-1">
-                    <li>Create a <code>profiles</code> table in Supabase with an <code>id</code> (UUID, foreign key to <code>auth.users.id</code>) and a <code>role</code> (TEXT) column.</li>
-                    <li>For each admin user, add a row in <code>profiles</code> with their user ID and set their <code>role</code> to <code>&apos;admin&apos;</code>. (SQL for this provided in chat).</li>
-                    <li>Set up appropriate Row Level Security (RLS) policies on your Supabase <code>profiles</code> table to allow authenticated users to read their own profile. (SQL for this provided in chat).</li>
+                    <li>Create a <code>profiles</code> table in Supabase with an <code>id</code> (UUID, foreign key to <code>auth.users.id</code>) and a <code>role</code> (TEXT) column. (SQL provided in chat).</li>
+                    <li>For each admin user, add a row in <code>profiles</code> with their user ID and set their <code>role</code> to <code>&apos;admin&apos;</code>. (SQL provided in chat).</li>
+                    <li>Set up appropriate Row Level Security (RLS) policies on your Supabase <code>profiles</code> table to allow authenticated users to read their own profile (e.g., <code>auth.uid() = id</code> for SELECT). (SQL provided in chat).</li>
                     <li>Client-side checks alone are not sufficient for full security. Secure your Supabase data with RLS and consider server-side protection for admin routes in production.</li>
                 </ol>
+                 <p className="mt-2">If you encounter authorization errors, please double-check your <code>profiles</code> table data and RLS policies in your Supabase project.</p>
             </CardContent>
         </Card>
 
@@ -256,5 +259,6 @@ export default function AdminPage() {
     </div>
   );
 }
+
 
     
