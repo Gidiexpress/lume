@@ -5,12 +5,12 @@ import React, { useState, useEffect, useActionState, startTransition } from 'rea
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { Loader2, UserCircle, Save, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
-import { updateUserProfile, type UserProfileState } from '@/app/admin-actions'; // Assuming you'll create this
+import { updateUserProfile, type UserProfileState } from '@/app/admin-actions'; 
 
 const initialProfileState: UserProfileState = { success: false, message: null };
 
@@ -36,7 +36,13 @@ export function UserProfileManager() {
             .single();
 
           if (error && error.code !== 'PGRST116') { // PGRST116: "Searched for one row, but found 0"
-            throw error;
+            // Check if it's a "profile not found" error due to RLS (common if RLS is too restrictive or profile doesn't exist)
+             if (error.code === 'PGRST000' || error.code === 'PGRST116') {
+                console.warn("User profile not found or access denied. This might be expected if the profile hasn't been created yet or RLS rules prevent access. User ID:", session.user.id);
+                 setFullName(''); // Default to empty if profile not found/accessible
+            } else {
+                throw error; // Re-throw other errors
+            }
           }
           if (profile) {
             setFullName(profile.full_name || '');
@@ -78,7 +84,7 @@ export function UserProfileManager() {
 
   if (isLoadingProfile) {
     return (
-      <Card className="shadow-lg">
+      <Card className="shadow-lg max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-xl font-semibold flex items-center">
             <UserCircle className="mr-2 h-6 w-6 text-primary" />
@@ -140,7 +146,7 @@ export function UserProfileManager() {
        <Card className="bg-blue-50 border-blue-200 shadow-md dark:bg-blue-900/30 dark:border-blue-700 max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-blue-700 dark:text-blue-300 text-sm flex items-center">
-            <Info className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" /> Important Note on Roles
+            <Info className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" /> Important Note on Roles & RLS
             </CardTitle>
         </CardHeader>
         <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-1">
@@ -149,25 +155,45 @@ export function UserProfileManager() {
            </p>
            <p>
             For Supabase, ensure your RLS policy on the <code>profiles</code> table allows users to update their own <code>full_name</code> and <code>updated_at</code> columns, but restricts changes to sensitive columns like <code>role</code>.
-            Example RLS for update (more restrictive):
+            An appropriate RLS policy for updating one's own profile (excluding the role field by users) might look like this:
            </p>
             <pre className="mt-1 p-2 bg-stone-100 dark:bg-stone-800 rounded text-xs overflow-x-auto">
-{`CREATE POLICY "Allow authenticated users to update their own name"
+{`-- Assumes you have a 'profiles' table with 'id' (uuid, PK, FK to auth.users), 'full_name' (text), 'role' (text)
+
+-- Allow users to update their own full_name and ensure updated_at is set
+CREATE POLICY "Allow users to update their own full_name"
 ON public.profiles
 FOR UPDATE
 TO authenticated
 USING (auth.uid() = id)
-WITH CHECK (auth.uid() = id AND (
-  -- List allowed columns for update explicitly to protect 'role'
-  (request.new_values->>'full_name' IS NOT NULL OR request.old_values->>'full_name' IS NOT NULL)
-  -- Add other updatable columns here, e.g. avatar_url
-));`}
+WITH CHECK (
+  auth.uid() = id AND
+  -- Ensure the 'role' column is not being changed by this policy
+  (current_setting('request.jwt.claims', true)::jsonb->>'role' IS NULL OR (current_setting('request.jwt.claims', true)::jsonb->>'role')::text = (SELECT role FROM public.profiles WHERE id = auth.uid()))
+  -- The above is a complex way to say "don't let users change their own role".
+  -- A simpler approach for this form is to ensure your backend logic/Server Action only updates specific fields.
+  -- The Server Action 'updateUserProfile' only updates 'full_name' and 'updated_at', so it's safer.
+  -- A more direct RLS to allow update of only specific columns is not straightforward in Supabase's SQL RLS.
+  -- A better approach is to rely on the Server Action to only update allowed fields.
+  -- However, a basic update policy:
+  true -- This should be refined. The server action is the primary guard here.
+);
+
+-- Simpler policy if your Server Action is trusted to only update specific fields:
+CREATE POLICY "Allow users to update their own profile via trusted actions"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+`}
             </pre>
-            <p className="text-xs mt-1">Note: The SQL above is a simplified example; you might need to adjust it for your specific needs, such as allowing NULL values or checking specific column changes if you have more updatable fields.</p>
+            <p className="text-xs mt-1">
+              <strong>Important:</strong> The <code>updateUserProfile</code> server action in <code>src/app/admin-actions.ts</code> is designed to only update <code>full_name</code> and <code>updated_at</code>.
+              Your RLS policies should complement this by ensuring users can indeed update their own profile record (<code>USING (auth.uid() = id)</code>) while more restrictive policies or server-side logic would prevent them from elevating their privileges by modifying the <code>role</code> column.
+            </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    
