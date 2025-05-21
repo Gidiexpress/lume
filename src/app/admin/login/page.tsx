@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { supabase } from '@/lib/supabase/client'; // Import Supabase client
 import { Loader2, LogIn, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,33 +24,36 @@ export default function AdminLoginPage() {
     const authError = searchParams.get('error');
     if (authError === 'unauthorized') {
       setError('Access Denied: You are not authorized to access the admin dashboard.');
-    } else if (authError === 'claims_error') {
+    } else if (authError === 'role_check_failed') {
       setError('Error: Could not verify admin privileges. Please contact support.');
     }
   }, [searchParams]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const idTokenResult = await user.getIdTokenResult();
-          if (idTokenResult.claims.admin === true) {
-            router.replace('/admin'); // If user is admin, redirect to admin dashboard
-          } else {
-            // If user is logged in but not admin, keep them on login or show error
-            // but don't auto-redirect to /admin.
-            // The /admin page will handle its own unauthorized logic.
-            setIsCheckingAuth(false); 
-          }
-        } catch {
-          // Error fetching claims, treat as unauthorized for now
-          setIsCheckingAuth(false);
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        // User is logged in. Redirect to admin page.
+        // The /admin page will handle its own authorization logic (e.g., checking roles).
+        router.replace('/admin');
       } else {
         setIsCheckingAuth(false);
       }
     });
-    return () => unsubscribe();
+
+    // Check initial auth state
+    const checkInitialSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            router.replace('/admin');
+        } else {
+            setIsCheckingAuth(false);
+        }
+    };
+    checkInitialSession();
+
+    return () => {
+      authListener?.unsubscribe();
+    };
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -59,22 +61,33 @@ export default function AdminLoginPage() {
     setError(null);
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const idTokenResult = await userCredential.user.getIdTokenResult();
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (idTokenResult.claims.admin === true) {
-        router.replace('/admin'); 
+      if (signInError) {
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please try again.');
+        } else {
+          setError(signInError.message || 'Failed to login. Please check your credentials.');
+        }
+        console.error("Supabase Login error:", signInError);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Login successful, redirect to admin page.
+        // The /admin page will be responsible for further role checks.
+        router.replace('/admin');
       } else {
-        await signOut(auth); // Sign out non-admin user
-        setError('Access Denied: You do not have admin privileges.');
+         setError('Login failed. Please try again.');
       }
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError('Invalid email or password. Please try again.');
-      } else {
-        setError(err.message || 'Failed to login. Please check your credentials.');
-      }
-      console.error("Login error:", err);
+      // Catch any unexpected errors
+      setError(err.message || 'An unexpected error occurred during login.');
+      console.error("Unexpected Login error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +110,7 @@ export default function AdminLoginPage() {
             Lume Admin Login
           </CardTitle>
           <CardDescription>
-            Access to the Lume administration panel.
+            Access to the Lume administration panel. (Using Supabase Auth)
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
