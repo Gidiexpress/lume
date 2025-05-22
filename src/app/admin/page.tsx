@@ -12,11 +12,13 @@ import { AffiliateLinkManager } from '@/components/admin/AffiliateLinkManager';
 import { PaymentsDashboard } from '@/components/admin/PaymentsDashboard';
 import { AiActivityMonitor } from '@/components/admin/AiActivityMonitor';
 import { FeedbackManager } from '@/components/admin/FeedbackManager';
-import { UserProfileManager } from '@/components/admin/UserProfileManager'; // New Import
-import { LayoutDashboard, Link2, LineChart, DollarSign, BrainCircuit, MessageSquare, LogOut, Loader2, ArrowLeft, ShieldAlert, UserCircle } from 'lucide-react'; // Added UserCircle
+import { UserProfileManager } from '@/components/admin/UserProfileManager';
+import { LayoutDashboard, Link2, LineChart, DollarSign, BrainCircuit, MessageSquare, LogOut, Loader2, ArrowLeft, ShieldAlert, UserCircle, AlertTriangle, Info } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,18 +45,25 @@ export default function AdminPage() {
       if (profileError) {
         console.error('Error fetching user profile:', JSON.stringify(profileError, null, 2));
         let description = 'Could not verify admin privileges. Please ensure your profile is set up correctly.';
-        if (profileError.code === 'PGRST116') {
-          description = 'Your user profile was not found. Admin role cannot be verified. Please contact support.';
-          toast({ title: 'Profile Not Found', description, variant: 'destructive' });
+        
+        if (profileError.message && profileError.message.toLowerCase().includes('failed to fetch')) {
+            description = 'Network Error: Could not connect to Supabase to verify admin role. Please check your internet connection and ensure Supabase URL/Anon Key are correct in your .env.local file.';
+            toast({ title: 'Network Error', description, variant: 'destructive', duration: 10000 });
+        } else if (profileError.code === 'PGRST116') { // "Searched for one row, but found 0"
+          description = 'Your user profile was not found in the "profiles" table, or the "role" column is missing/empty. Admin role cannot be verified. Please contact support or check Supabase setup.';
+          toast({ title: 'Profile Not Found for Role Check', description, variant: 'destructive', duration: 10000 });
         } else if (profileError.message && profileError.message.includes('infinite recursion')) {
-          description = 'Supabase RLS Policy Error: Infinite recursion detected. Please check your RLS policies on the "profiles" table. Ensure SELECT policies do not cause a loop by querying "profiles" within a policy for "profiles". Use `auth.uid() = id` for basic profile reads.';
-           toast({ title: 'RLS Policy Error', description, variant: 'destructive' });
+          description = 'Supabase RLS Policy Error: Infinite recursion detected in a policy for the "profiles" table. Please check your RLS policies. The policy for reading your own profile should be: `(auth.uid() = id)`.';
+           toast({ title: 'RLS Policy Error', description, variant: 'destructive', duration: 10000 });
         } else {
-          toast({ title: 'Authorization Error', description: `${description} (Error: ${profileError.message || 'Unknown Supabase error'})`, variant: 'destructive' });
+          toast({ title: 'Authorization Error', description: `${description} (Error: ${profileError.message || 'Unknown Supabase error'})`, variant: 'destructive', duration: 10000 });
         }
+        
         await supabase.auth.signOut().catch(console.error);
         setIsAuthorized(false);
-        const errorType = profileError.code === 'PGRST116' ? 'profile_not_found' : 'role_check_failed';
+        const errorType = profileError.message && profileError.message.toLowerCase().includes('failed to fetch') ? 'network_error' 
+                        : profileError.code === 'PGRST116' ? 'profile_not_found' 
+                        : 'role_check_failed';
         router.replace(`/admin/login?error=${errorType}&message=${encodeURIComponent(description)}`);
         return false;
       }
@@ -63,8 +72,8 @@ export default function AdminPage() {
         setIsAuthorized(true);
         return true;
       } else {
-        const description = 'You do not have admin privileges. Access denied.';
-        toast({ title: 'Access Denied', description, variant: 'destructive' });
+        const description = `Access Denied: Your profile does not have 'admin' role or profile is incomplete. Current role: '${profile?.role || 'not set'}'.`;
+        toast({ title: 'Access Denied', description, variant: 'destructive', duration: 10000 });
         await supabase.auth.signOut().catch(console.error);
         setIsAuthorized(false);
         router.replace(`/admin/login?error=unauthorized&message=${encodeURIComponent(description)}`);
@@ -97,18 +106,19 @@ export default function AdminPage() {
       await checkAdminRole(session.user);
     });
 
+    // Check initial auth state
     const checkInitialSession = async () => {
-      setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setUser(null);
-        setIsAuthorized(false);
-        router.replace('/admin/login');
-        setIsLoading(false);
-      } else {
-        setUser(session.user);
-        await checkAdminRole(session.user);
-      }
+        setIsLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+            setUser(null);
+            setIsAuthorized(false);
+            router.replace('/admin/login');
+            setIsLoading(false);
+        } else {
+            setUser(session.user);
+            await checkAdminRole(session.user);
+        }
     };
     checkInitialSession();
 
@@ -152,12 +162,14 @@ export default function AdminPage() {
   }
 
   if (!user || !isAuthorized) {
+    // The checkAdminRole function handles redirection and toasts for unauthorized users.
+    // This return is a fallback or for when isLoading is false but authorization check is still pending or explicitly failed.
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
          <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
          <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
-         <p className="text-muted-foreground mb-6 text-center">
-            You are not authorized to view this page or your session has expired. Please log in with an admin account.
+         <p className="text-muted-foreground mb-6 text-center max-w-md">
+            You are not authorized to view this page, your session has expired, or there was an issue verifying your admin privileges. Please log in with an admin account.
          </p>
          <Button onClick={() => router.push('/admin/login')}>
             Go to Admin Login
@@ -193,10 +205,45 @@ export default function AdminPage() {
       <main className="flex-grow container mx-auto px-4 py-8">
         <p className="text-sm text-muted-foreground mb-4 md:hidden">Logged in as: {user.email}</p>
         
-        {/* Removed Supabase Setup Instructional Card */}
+        <Card className="mb-8 bg-blue-50 border-blue-200 shadow-md dark:bg-blue-900/30 dark:border-blue-700">
+            <CardHeader className="flex flex-row items-center">
+                <Info className="h-5 w-5 mr-2 text-blue-500 dark:text-blue-400" />
+                <CardTitle className="text-blue-700 dark:text-blue-300 text-base">Admin Dashboard Setup Checklist</CardTitle>
+            </CardHeader>
+            <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-2">
+                <p>For full admin functionality and security, ensure the following Supabase setup:</p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                    <li>
+                        <strong>Environment Variables:</strong> <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> must be correctly set in your <code>.env.local</code> file.
+                    </li>
+                    <li>
+                        <strong>`profiles` Table:</strong> A table named <code>profiles</code> exists in your Supabase public schema.
+                        It must have an <code>id</code> column (UUID, primary key, foreign key to <code>auth.users.id</code>) and a <code>role</code> column (TEXT).
+                    </li>
+                    <li>
+                        <strong>Admin User Record:</strong> The admin user must have an entry in the <code>profiles</code> table with their <code>id</code> matching their Auth user ID, and their <code>role</code> column set to <code>'admin'</code>.
+                    </li>
+                    <li>
+                        <strong>Row Level Security (RLS) for `profiles`:</strong>
+                        <ul className="list-circle list-inside pl-5 text-xs mt-1">
+                            <li>Enable RLS on the <code>profiles</code> table.</li>
+                            <li>Policy for users to read their own profile: <code>CREATE POLICY "Allow individual read access to own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);</code></li>
+                            <li>(Optional but recommended) Policies for creating/updating profiles, ensuring users cannot change their own role without authorization.</li>
+                        </ul>
+                    </li>
+                     <li>
+                        <strong>Network Access:</strong> Ensure your browser and deployment environment can reach your Supabase project URL. Check for firewalls, proxies, or ad-blockers if you encounter "Failed to fetch" errors.
+                    </li>
+                    <li>
+                        <strong>RLS for other tables (e.g., `affiliateLinks`):</strong> Ensure RLS policies on other tables like <code>affiliateLinks</code> correctly use <code>(EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'))</code> in their <code>USING</code> and <code>WITH CHECK</code> clauses for admin-only operations. Avoid self-referencing RLS policies on the <code>profiles</code> table that could cause infinite recursion.
+                    </li>
+                </ul>
+                <p className="mt-3">If you are seeing "Failed to fetch" errors, verify your internet connection and Supabase URL/keys first. If you see "Profile Not Found" or "Access Denied" due to role, verify the <code>profiles</code> table data and RLS policies.</p>
+            </CardContent>
+        </Card>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 mb-6"> {/* Adjusted grid for new tab */}
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 mb-6">
             <TabsTrigger value="analytics">
               <LineChart className="mr-2 h-4 w-4" />
               Analytics
@@ -217,7 +264,7 @@ export default function AdminPage() {
               <MessageSquare className="mr-2 h-4 w-4" />
               Feedback
             </TabsTrigger>
-            <TabsTrigger value="profile"> {/* New Tab Trigger */}
+            <TabsTrigger value="profile">
               <UserCircle className="mr-2 h-4 w-4" />
               My Profile
             </TabsTrigger>
@@ -237,7 +284,7 @@ export default function AdminPage() {
           <TabsContent value="feedback" className="mt-6">
             <FeedbackManager />
           </TabsContent>
-          <TabsContent value="profile" className="mt-6"> {/* New Tab Content */}
+          <TabsContent value="profile" className="mt-6">
             <UserProfileManager />
           </TabsContent>
         </Tabs>
@@ -248,5 +295,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
