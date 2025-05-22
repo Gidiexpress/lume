@@ -32,19 +32,23 @@ export function AffiliateLinkManager() {
 
   const fetchLinks = async () => {
     setIsLoading(true);
-    setDbTableMissingError(null); // Reset error on fetch
+    setDbTableMissingError(null); 
     const result = await getAffiliateLinks();
+    console.log("Client: getAffiliateLinks result:", result); // Log client-side result
+
     if (result.success && Array.isArray(result.data)) {
       setLinks(result.data);
     } else {
       const errorMessage = result.message || 'Could not fetch affiliate links.';
+      console.error("Client: Error message from fetchLinks:", errorMessage); // Log the full error message
+
       if (errorMessage.includes("relation") && errorMessage.includes("does not exist")) {
-        const specificError = `The 'affiliateLinks' table was not found in your Supabase database. Please create it using the SQL schema provided in the 'Important Supabase Setup' card below and ensure RLS policies are set.`;
+        const specificError = `The 'affiliateLinks' table was not found in your Supabase database. Please create it using the SQL schema provided in the 'Important Supabase Setup' card below and ensure RLS policies are set. Original error: ${errorMessage}`;
         toast({ 
           title: 'Database Table Missing', 
           description: specificError, 
           variant: 'destructive',
-          duration: 15000 
+          duration: 20000 
         });
         setDbTableMissingError(specificError);
       } else {
@@ -94,9 +98,10 @@ export function AffiliateLinkManager() {
   const handleFormSubmit = () => {
     const formData = new FormData();
     if (currentLink?.id) formData.append('id', currentLink.id);
-    if (!currentLink || formValues.title) {
-      formData.append('title', formValues.title || ''); 
-    }
+    // Title is critical and part of uniqueness. For updates, it's passed but not changed by the update action.
+    // For adds, it's set from formValues.
+    formData.append('title', formValues.title || (currentLink?.title || '')); 
+    
     formData.append('affiliateUrl', formValues.affiliateUrl);
     if (formValues.displayText) formData.append('displayText', formValues.displayText);
 
@@ -166,11 +171,12 @@ export function AffiliateLinkManager() {
           ) : dbTableMissingError ? (
             <div className="p-4 my-4 text-center bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
               <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-              <p className="font-semibold text-lg mb-1">Database Table Missing</p>
-              <p>{dbTableMissingError}</p>
+              <p className="font-semibold text-lg mb-1">Database Table Configuration Issue</p>
+              <p className="text-sm whitespace-pre-wrap">{dbTableMissingError}</p>
+              <p className="text-xs mt-2">Please refer to the setup instructions below or check your server logs for more details from Supabase.</p>
             </div>
           ) : links.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. Ensure the 'affiliateLinks' table exists in your Supabase database (see setup instructions below).</p>
+            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. Ensure the 'affiliateLinks' table exists in your Supabase database and has data.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -214,7 +220,7 @@ export function AffiliateLinkManager() {
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(); }}>
             <div className="space-y-4 py-4">
-              <div>
+              <div className="space-y-1">
                 <Label htmlFor="title">Title (Course title to match)*</Label>
                 <Input 
                   id="title" 
@@ -224,12 +230,11 @@ export function AffiliateLinkManager() {
                   placeholder="e.g., Introduction to Python" 
                   required 
                   disabled={isActionPending || !!currentLink} 
-                  className="mt-1"
                 />
                 {currentLink && <p className="text-xs text-muted-foreground mt-1">Title (matching key) cannot be changed after creation to maintain data integrity. To change a title, please delete and re-add the link.</p>}
               </div>
               
-              <div>
+              <div className="space-y-1">
                 <Label htmlFor="affiliateUrl">Affiliate URL*</Label>
                 <Input 
                   id="affiliateUrl" 
@@ -240,11 +245,10 @@ export function AffiliateLinkManager() {
                   placeholder="https://partner.com/course?ref=lume" 
                   required 
                   disabled={isActionPending}
-                  className="mt-1"
                 />
               </div>
 
-              <div>
+              <div className="space-y-1">
                 <Label htmlFor="displayText">Display Text (Optional)</Label>
                 <Input 
                   id="displayText" 
@@ -253,7 +257,6 @@ export function AffiliateLinkManager() {
                   onChange={handleInputChange} 
                   placeholder="e.g., Special Course Offer" 
                   disabled={isActionPending}
-                  className="mt-1"
                 />
               </div>
               
@@ -297,15 +300,16 @@ export function AffiliateLinkManager() {
             </CardTitle>
         </CardHeader>
         <CardContent className="text-blue-600 dark:text-blue-300/90 text-sm space-y-2">
+          <p>If you see errors like "Database Table Missing" or "relation 'public.affiliateLinks' does not exist", ensure the following:</p>
           <ul className="list-disc list-inside pl-4 space-y-1">
-            <li><strong>Table Creation:</strong> If you see errors about "relation 'public.affiliateLinks' does not exist" or "Database Table Missing", you **must create the `affiliateLinks` table** in your Supabase project's `public` schema.
-              SQL to create table:
+            <li><strong>Table Creation:</strong> You **must create the `affiliateLinks` table** in your Supabase project's `public` schema.
+              SQL to create table (run in Supabase SQL Editor):
               <pre className="mt-1 mb-1 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">{
 `CREATE TABLE public.affiliateLinks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL UNIQUE,
-  "affiliateUrl" TEXT NOT NULL,
-  "displayText" TEXT,
+  "affiliateUrl" TEXT NOT NULL, -- Note: Quoted, so case-sensitive
+  "displayText" TEXT, -- Note: Quoted, so case-sensitive
   created_at TIMESTAMPTZ DEFAULT now()
 );
 COMMENT ON TABLE public.affiliateLinks IS 'Stores affiliate links for courses and resources.';
@@ -315,37 +319,37 @@ ALTER TABLE public.affiliateLinks ENABLE ROW LEVEL SECURITY;`
             <li>Ensure your Supabase project URL and Anon Key are correctly set in your environment variables (e.g., <code>.env.local</code> as <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible in <code>src/lib/supabase/client.ts</code>.</li>
             <li>Set up Supabase Row Level Security (RLS) policies. For admin actions (add/edit/delete), you'll need policies that allow these operations only for authenticated users with an admin role (e.g., checking a `role` column in a `profiles` table that is linked to `auth.users.id`). Example:
               <pre className="mt-1 mb-1 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">{
-`-- Example RLS: Allow admins to manage affiliate links
+`-- RLS Policy: Allow admins to manage all aspects of affiliate links
 CREATE POLICY "Admins can manage affiliate links"
 ON public.affiliateLinks
-FOR ALL
+FOR ALL -- Covers SELECT, INSERT, UPDATE, DELETE
 TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
   )
 )
-WITH CHECK (
+WITH CHECK ( -- Ensures new/updated rows also satisfy the condition
   EXISTS (
     SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
   )
 );
 
--- Allow public read access if links are fetched client-side for display in reports
+-- RLS Policy: Allow public read access if links are fetched client-side for display
+-- This is needed for fetchAndCacheAffiliateLinks in src/lib/affiliateLinks.ts
 CREATE POLICY "Allow public read access to affiliate links"
 ON public.affiliateLinks
 FOR SELECT
-TO public -- or 'authenticated'
+TO public -- Or 'authenticated' if you only want logged-in users to see them
 USING (true);`
               }</pre>
             </li>
-            <li>Client-side read access for `fetchAndCacheAffiliateLinks` (used in `CareerPathDisplay.tsx`) requires the "Allow public read access" RLS policy to be effective for the `anon` or `authenticated` role, depending on your setup.</li>
+            <li>Client-side read access for `fetchAndCacheAffiliateLinks` (used in `CareerPathDisplay.tsx`) requires an RLS policy (like the "Allow public read access" example above) to be effective for the `anon` or `authenticated` role, depending on your setup.</li>
+            <li>**Column Naming**: If you created `affiliateUrl` and `displayText` columns *without* double quotes in SQL, they will be lowercase (e.g., `affiliateurl`). The JavaScript code has been updated to query for `"affiliateUrl"` and `"displayText"` (quoted, camelCase) to match the provided `CREATE TABLE` SQL. Ensure your table schema matches this.</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-
     

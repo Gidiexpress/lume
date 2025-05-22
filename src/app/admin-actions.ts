@@ -32,18 +32,36 @@ export interface UserProfileState {
 export async function getAffiliateLinks(): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
   try {
-    // No explicit auth check here as affiliate links might be public readable
-    // depending on RLS. If fetching needs admin rights, add auth check like below.
+    console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
     const { data, error } = await supabase
       .from('affiliateLinks')
-      .select('*')
+      .select('id, title, "affiliateUrl", "displayText", created_at') // Use quoted column names if they were created quoted
       .order('title', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error("[AdminAction] Supabase error in getAffiliateLinks:", JSON.stringify(error, null, 2));
+      throw error;
+    }
+    console.log("[AdminAction] Affiliate links fetched successfully from Supabase.");
     return { success: true, message: 'Affiliate links fetched successfully.', data: data as CourseLink[] };
   } catch (error: any) {
-    console.error("Error fetching affiliate links from Supabase:", error);
-    return { success: false, message: error.message || 'Failed to fetch affiliate links.', data: [] };
+    console.error("[AdminAction] Catch block in getAffiliateLinks. Error:", JSON.stringify(error, null, 2));
+    
+    let clientErrorMessage = 'Failed to fetch affiliate links.';
+    if (error.message) {
+      clientErrorMessage = error.message;
+    }
+    if (error.code) {
+        clientErrorMessage += ` (Code: ${error.code})`;
+    }
+     if (error.details) {
+        clientErrorMessage += ` Details: ${error.details}`;
+    }
+    if (error.hint) {
+        clientErrorMessage += ` Hint: ${error.hint}`;
+    }
+
+    return { success: false, message: clientErrorMessage, data: [] };
   }
 }
 
@@ -54,18 +72,18 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
   const { data: userData, error: authError } = await supabase.auth.getUser();
 
   if (authError) {
-    console.error('Supabase auth.getUser() error in addAffiliateLink:', authError);
+    console.error('[AdminAction] Supabase auth.getUser() error in addAffiliateLink:', JSON.stringify(authError, null, 2));
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
   if (!userData?.user) {
-    console.error('No user session found in addAffiliateLink server action. AuthError (if any):', authError);
+    console.error('[AdminAction] No user session found in addAffiliateLink server action. AuthError (if any):', JSON.stringify(authError, null, 2));
     return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
   if (profileError) {
-    console.error('Error fetching profile in addAffiliateLink:', profileError);
+    console.error('[AdminAction] Error fetching profile in addAffiliateLink:', JSON.stringify(profileError, null, 2));
     return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
   }
   if (!profile || profile.role !== 'admin') {
@@ -97,6 +115,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
       .maybeSingle();
 
     if (selectError && selectError.code !== 'PGRST116') { 
+        console.error('[AdminAction] Error checking existing link:', JSON.stringify(selectError, null, 2));
         throw selectError;
     }
     if (existingLink) {
@@ -105,14 +124,17 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
 
     const { data: newLink, error: insertError } = await supabase
       .from('affiliateLinks')
-      .insert([{ title, affiliateUrl, displayText: displayText || null }])
-      .select()
+      .insert([{ title, affiliateUrl: affiliateUrl, displayText: displayText || null }]) // Ensure mapping matches DB column names
+      .select('id, title, "affiliateUrl", "displayText", created_at')
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+        console.error('[AdminAction] Error inserting new link:', JSON.stringify(insertError, null, 2));
+        throw insertError;
+    }
     return { success: true, message: 'Affiliate link added successfully.', data: newLink as CourseLink };
   } catch (error: any) {
-    console.error("Error adding affiliate link to Supabase:", error);
+    console.error("[AdminAction] Catch block in addAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to add link: The operation violates the database security policy. Ensure your admin account has permissions to add to 'affiliateLinks'. (Error: ${error.message})` };
     }
@@ -126,18 +148,18 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
 
   const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError) {
-    console.error('Supabase auth.getUser() error in updateAffiliateLink:', authError);
+    console.error('[AdminAction] Supabase auth.getUser() error in updateAffiliateLink:', JSON.stringify(authError, null, 2));
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
   if (!userData?.user) {
-    console.error('No user session found in updateAffiliateLink server action. AuthError (if any):', authError);
+    console.error('[AdminAction] No user session found in updateAffiliateLink server action. AuthError (if any):', JSON.stringify(authError, null, 2));
     return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
   if (profileError) {
-    console.error('Error fetching profile in updateAffiliateLink:', profileError);
+    console.error('[AdminAction] Error fetching profile in updateAffiliateLink:', JSON.stringify(profileError, null, 2));
     return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
   }
   if (!profile || profile.role !== 'admin') {
@@ -165,9 +187,13 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     };
   }
 
+  // Title cannot be updated via this form to maintain uniqueness and simplicity.
+  // Only affiliateUrl and displayText are updated.
   const { affiliateUrl, displayText } = validatedFields.data;
-  // Title cannot be updated via this form, so it's not included in updatedData.
-  const updatedData: Partial<Omit<CourseLink, 'id' | 'title'>> = { affiliateUrl, displayText: displayText || null };
+  const updatedData: { "affiliateUrl": string; "displayText": string | null } = { 
+    "affiliateUrl": affiliateUrl, 
+    "displayText": displayText || null 
+  };
 
 
   try {
@@ -175,15 +201,18 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
       .from('affiliateLinks')
       .update(updatedData)
       .eq('id', id)
-      .select()
+      .select('id, title, "affiliateUrl", "displayText", created_at')
       .single();
 
-    if (error) throw error;
+    if (error) {
+        console.error('[AdminAction] Error updating link:', JSON.stringify(error, null, 2));
+        throw error;
+    }
     if (!updatedLink) return { success: false, message: 'Failed to find link to update or update failed.' };
 
     return { success: true, message: 'Affiliate link updated successfully.', data: updatedLink as CourseLink };
   } catch (error: any) {
-    console.error("Error updating affiliate link in Supabase:", error);
+    console.error("[AdminAction] Catch block in updateAffiliateLink. Error:", JSON.stringify(error, null, 2));
      if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to update link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -197,18 +226,18 @@ export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminAct
 
   const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError) {
-    console.error('Supabase auth.getUser() error in deleteAffiliateLink:', authError);
+    console.error('[AdminAction] Supabase auth.getUser() error in deleteAffiliateLink:', JSON.stringify(authError, null, 2));
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
   if (!userData?.user) {
-    console.error('No user session found in deleteAffiliateLink server action. AuthError (if any):', authError);
+    console.error('[AdminAction] No user session found in deleteAffiliateLink server action. AuthError (if any):', JSON.stringify(authError, null, 2));
     return { success: false, message: 'Authentication error: Auth session missing!. Please try logging in again.' };
   }
   const user = userData.user;
 
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
   if (profileError) {
-    console.error('Error fetching profile in deleteAffiliateLink:', profileError);
+    console.error('[AdminAction] Error fetching profile in deleteAffiliateLink:', JSON.stringify(profileError, null, 2));
     return { success: false, message: `Authorization failed. Could not retrieve profile: ${profileError.message}` };
   }
   if (!profile || profile.role !== 'admin') {
@@ -225,10 +254,13 @@ export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminAct
       .delete()
       .eq('id', linkId);
 
-    if (error) throw error;
+    if (error) {
+        console.error('[AdminAction] Error deleting link:', JSON.stringify(error, null, 2));
+        throw error;
+    }
     return { success: true, message: 'Affiliate link deleted successfully.' };
   } catch (error: any) {
-    console.error("Error deleting affiliate link from Supabase:", error);
+    console.error("[AdminAction] Catch block in deleteAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to delete link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -246,11 +278,11 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
   
   const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError) {
-    console.error('Supabase auth.getUser() error in updateUserProfile:', authError);
+    console.error('[AdminAction] Supabase auth.getUser() error in updateUserProfile:', JSON.stringify(authError, null, 2));
     return { success: false, message: `Authentication error: ${authError.message}. Please try logging in again.` };
   }
   if (!userData?.user) {
-    console.error('No user session found in updateUserProfile server action. AuthError (if any):', authError);
+    console.error('[AdminAction] No user session found in updateUserProfile server action. AuthError (if any):', JSON.stringify(authError, null, 2));
     return { success: false, message: "Authentication error: Auth session missing!. Please log in again." };
   }
   const user = userData.user;
@@ -276,10 +308,14 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
       .update({ full_name: fullName, updated_at: new Date().toISOString() })
       .eq('id', user.id);
 
-    if (error) throw error;
+    if (error) {
+        console.error('[AdminAction] Error updating profile in Supabase:', JSON.stringify(error, null, 2));
+        throw error;
+    }
     return { success: true, message: 'Profile updated successfully.' };
   } catch (error: any) {
-    console.error("Error updating user profile:", error);
+    console.error("[AdminAction] Catch block in updateUserProfile. Error:", JSON.stringify(error, null, 2));
     return { success: false, message: error.message || 'Failed to update profile.' };
   }
 }
+    
