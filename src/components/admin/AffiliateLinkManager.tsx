@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { CourseLink } from '@/lib/affiliateLinks';
 import { getAffiliateLinks, addAffiliateLink, updateAffiliateLink, deleteAffiliateLink, type AdminActionState } from '@/app/admin-actions';
 
-const initialFormValues: Omit<CourseLink, 'id'> & { id?: string; title?: string } = {
+const initialFormValues: Omit<CourseLink, 'id' | 'created_at'> & { id?: string; title?: string } = {
     title: '',
     affiliateUrl: '',
     displayText: '',
@@ -22,10 +22,10 @@ const initialFormValues: Omit<CourseLink, 'id'> & { id?: string; title?: string 
 export function AffiliateLinkManager() {
   const [links, setLinks] = useState<CourseLink[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // General loading for fetch/delete
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [currentLink, setCurrentLink] = useState<CourseLink | null>(null); // For editing
-  const [formValues, setFormValues] = useState<Omit<CourseLink, 'id'> & { id?: string; title?: string }>(initialFormValues);
+  const [currentLink, setCurrentLink] = useState<CourseLink | null>(null);
+  const [formValues, setFormValues] = useState<Omit<CourseLink, 'id' | 'created_at'> & { id?: string; title?: string }>(initialFormValues);
   const [dbTableMissingError, setDbTableMissingError] = useState<string | null>(null);
   
   const { toast } = useToast();
@@ -48,7 +48,7 @@ export function AffiliateLinkManager() {
           title: 'Database Table Missing', 
           description: specificError, 
           variant: 'destructive',
-          duration: 30000 // Keep toast longer for critical setup error
+          duration: 30000 
         });
         setDbTableMissingError(specificError);
       } else {
@@ -65,8 +65,9 @@ export function AffiliateLinkManager() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  const [addActionState, addFormAction, isAddPending] = useActionState(addAffiliateLink, {success: false, message: null, issues: []});
-  const [updateActionState, updateFormAction, isUpdatePending] = useActionState(updateAffiliateLink, {success: false, message: null, issues: []});
+  const initialActionState: AdminActionState = { success: false, message: null, issues: [] };
+  const [addActionState, addFormAction, isAddPending] = useActionState(addAffiliateLink, initialActionState);
+  const [updateActionState, updateFormAction, isUpdatePending] = useActionState(updateAffiliateLink, initialActionState);
 
 
   useEffect(() => {
@@ -101,7 +102,6 @@ export function AffiliateLinkManager() {
     const formData = new FormData();
     if (currentLink?.id) formData.append('id', currentLink.id);
     formData.append('title', formValues.title || (currentLink?.title || '')); 
-    
     formData.append('affiliateUrl', formValues.affiliateUrl);
     if (formValues.displayText) formData.append('displayText', formValues.displayText);
 
@@ -169,22 +169,25 @@ export function AffiliateLinkManager() {
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading links...
             </div>
           ) : dbTableMissingError ? (
-            <div className="p-6 my-4 text-center bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
-              <AlertTriangle className="mx-auto h-10 w-10 mb-3" />
-              <p className="font-semibold text-xl mb-2">Database Table Missing or Inaccessible</p>
-              <p className="text-sm whitespace-pre-wrap mb-1">The application could not find the <strong>`affiliateLinks`</strong> table in your Supabase database's `public` schema.</p>
-              <p className="text-sm whitespace-pre-wrap mb-3"><strong>Original Error:</strong> {dbTableMissingError.split('\n\n')[1] || dbTableMissingError}</p>
-              <p className="text-sm">
-                Please carefully follow the SQL setup instructions provided in the "Important Supabase Setup" card below.
-                Ensure the table name is exactly <strong>`affiliateLinks`</strong> (all lowercase).
-              </p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={fetchLinks} disabled={isLoading}>
+            <div className="p-4 my-4 bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
+              <div className="flex items-start">
+                <AlertTriangle className="h-6 w-6 mr-3 flex-shrink-0 mt-1" />
+                <div>
+                  <p className="font-semibold text-lg mb-1">Database Table Missing or Inaccessible</p>
+                  <p className="text-sm whitespace-pre-wrap">{dbTableMissingError.split('\n\n')[0]}</p>
+                  {dbTableMissingError.includes("Original error:") &&
+                    <p className="text-xs font-mono p-1.5 my-1.5 bg-destructive/20 rounded whitespace-pre-wrap"><strong>Supabase Error:</strong> {dbTableMissingError.substring(dbTableMissingError.indexOf("Original error:") + "Original error:".length).trim()}</p>
+                  }
+                  <p className="text-sm whitespace-pre-wrap mt-1">{dbTableMissingError.split('\n\n')[2] || (dbTableMissingError.includes("Original error:") ? "" : dbTableMissingError.split('\n\n')[1])}</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="mt-3 border-destructive/50 hover:bg-destructive/20" onClick={fetchLinks} disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Retry Fetching Links
               </Button>
             </div>
           ) : links.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. Add your first link or ensure the 'affiliateLinks' table exists in your Supabase database and has data.</p>
+             <p className="text-muted-foreground text-center py-4">No affiliate links configured yet. Add your first link or ensure the 'affiliateLinks' table exists in your Supabase database (see setup guide below) and has data.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -241,7 +244,8 @@ export function AffiliateLinkManager() {
                 />
                 {currentLink && <p className="text-xs text-muted-foreground mt-1">Title (matching key) cannot be changed after creation to maintain data integrity. To change a title, please delete and re-add the link.</p>}
                  {(addActionState?.issues && addActionState.issues.some(issue => issue.toLowerCase().includes('title'))) && (
-                  <p className="text-xs text-destructive mt-1">
+                  <p className="text-xs text-destructive mt-1 flex items-center">
+                    <AlertTriangle size={14} className="mr-1" />
                     {addActionState.issues.find(issue => issue.toLowerCase().includes('title'))}
                   </p>
                 )}
@@ -260,7 +264,8 @@ export function AffiliateLinkManager() {
                   disabled={isActionPending}
                 />
                  {(addActionState?.issues && addActionState.issues.some(issue => issue.toLowerCase().includes('url'))) && (
-                  <p className="text-xs text-destructive mt-1">
+                   <p className="text-xs text-destructive mt-1 flex items-center">
+                    <AlertTriangle size={14} className="mr-1" />
                     {addActionState.issues.find(issue => issue.toLowerCase().includes('url'))}
                   </p>
                 )}
@@ -279,7 +284,7 @@ export function AffiliateLinkManager() {
               </div>
               
               { addActionState?.message && !addActionState.success && !isAddPending && (
-                <div className="space-y-2 mt-2">
+                <div className="mt-2">
                     <p className="text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
                       <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {addActionState.message}
                     </p>
@@ -287,7 +292,7 @@ export function AffiliateLinkManager() {
               )}
 
               { updateActionState?.message && !updateActionState.success && !isUpdatePending && (
-                 <div className="space-y-2 mt-2">
+                 <div className="mt-2">
                     <p className="text-sm text-destructive flex items-center p-2 bg-destructive/10 rounded-md border border-destructive/30">
                       <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" /> {updateActionState.message}
                     </p>
@@ -325,8 +330,8 @@ export function AffiliateLinkManager() {
 CREATE TABLE public.affiliateLinks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL UNIQUE,
-  "affiliateUrl" TEXT NOT NULL, -- Note: Quoted, so case-sensitive in DB
-  "displayText" TEXT,          -- Note: Quoted, so case-sensitive in DB
+  "affiliateUrl" TEXT NOT NULL, -- Note: Quoted, so case-sensitive
+  "displayText" TEXT,          -- Note: Quoted, so case-sensitive
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -336,14 +341,14 @@ COMMENT ON TABLE public.affiliateLinks IS 'Stores affiliate links for courses an
 ALTER TABLE public.affiliateLinks ENABLE ROW LEVEL SECURITY;`
               }</pre>
             </li>
-            <li>Ensure your Supabase project URL and Anon Key are correctly set in your environment variables (e.g., <code>.env.local</code> as <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible in <code>src/lib/supabase/client.ts</code>.</li>
+            <li>Ensure your Supabase project URL and Anon Key are correctly set in your environment variables (e.g., <code>.env.local</code> as <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) and accessible.</li>
             <li>
               <strong>Row Level Security (RLS) Policies:</strong> You need RLS policies to allow access.
-              <p className="mt-1">Example RLS policies (run in Supabase SQL Editor):</p>
+              <p className="mt-1">Example RLS policies (run in Supabase SQL Editor after table creation and enabling RLS):</p>
               <pre className="mt-1 mb-1 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">{
 `-- Policy: Allow admins to manage all aspects of affiliate links
--- (Assumes you have a 'profiles' table with 'id' and 'role' columns,
--- and 'role' is 'admin' for admin users)
+-- (Assumes you have a 'profiles' table with 'id' linking to auth.users.id and a 'role' column,
+-- and 'role' is 'admin' for admin users. Ensure 'profiles' table and its RLS are also correctly set up.)
 CREATE POLICY "Admins can manage affiliate links"
 ON public.affiliateLinks
 FOR ALL
@@ -360,19 +365,20 @@ WITH CHECK ( -- Ensures new/updated rows also satisfy the condition
 );
 
 -- Policy: Allow public read access to affiliate links
--- This is needed for the reports to fetch and display these links.
+-- This is needed for the reports to fetch and display these links (e.g., in CareerPathDisplay).
 CREATE POLICY "Allow public read access to affiliate links"
 ON public.affiliateLinks
 FOR SELECT
 TO public -- Or 'authenticated' if you only want logged-in users to see them
 USING (true);`
               }</pre>
+              <p className="text-xs mt-1"><strong>Checklist for RLS:</strong> 1. Table `profiles` exists. 2. `profiles.id` links to `auth.users.id`. 3. `profiles.role` column exists. 4. Admin user has a row in `profiles` with `role = 'admin'`. 5. RLS is enabled on `profiles` and allows admins to read their own role.</p>
             </li>
-            <li><strong>Column Naming Consistency:</strong> The provided SQL uses quoted, camelCase names like <code>"affiliateUrl"</code> and <code>"displayText"</code>. This makes them case-sensitive in the database. The application code queries them this way. If you created these columns without quotes (e.g., <code>affiliateurl</code>), your table schema would differ, and queries might fail for these specific columns. It's best to use the provided SQL.</li>
+            <li><strong>Column Naming Consistency:</strong> The provided SQL uses quoted, camelCase names like <code>"affiliateUrl"</code> and <code>"displayText"</code>. This makes them case-sensitive in the database. The application code (server actions) queries them this way. If you created these columns without quotes (e.g., <code>affiliateurl</code>), your table schema would differ, and queries might fail. It's best to use the provided SQL for table creation.</li>
+            <li><strong>Check Schema and Table Name:</strong> Ensure the table is in the `public` schema and the name is precisely `affiliateLinks` (all lowercase). Double-check for typos.</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
-    
