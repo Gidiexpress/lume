@@ -158,14 +158,17 @@ export async function emailResultsAction(
   prevState: EmailFormState | undefined,
   formData: FormData
 ): Promise<EmailFormState> {
+  console.log('[Email Action] Attempting to send email...');
   const validatedFields = EmailSchema.safeParse({
     email: formData.get('email'),
     resultsText: formData.get('resultsText'),
   });
 
   if (!validatedFields.success) {
+    const errorMessage = "Invalid data: " + validatedFields.error.issues.map(i => i.message).join(', ');
+    console.error('[Email Action] Validation Error:', errorMessage);
     return {
-      message: "Invalid data: " + validatedFields.error.issues.map(i => i.message).join(', '),
+      message: errorMessage,
       success: false,
     };
   }
@@ -175,17 +178,22 @@ export async function emailResultsAction(
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
   const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL;
 
+  console.log(`[Email Action] SendGrid API Key loaded: ${sendgridApiKey ? 'Yes (ends with ' + sendgridApiKey.slice(-5) + ')' : 'NO - MISSING!'}`);
+  console.log(`[Email Action] SendGrid From Email loaded: ${sendgridFromEmail || 'NO - MISSING!'}`);
+
   if (!sendgridApiKey) {
-    console.error("SendGrid API Key is not configured. Set SENDGRID_API_KEY environment variable.");
+    const errorMsg = "Email service is not configured (Admin error: API Key missing). Please try again later.";
+    console.error(`[Email Action] ${errorMsg}`);
     return {
-      message: "Email service is not configured (Admin error). Please try again later.",
+      message: errorMsg,
       success: false,
     };
   }
   if (!sendgridFromEmail) {
-    console.error("SendGrid From Email is not configured. Set SENDGRID_FROM_EMAIL environment variable.");
+     const errorMsg = "Email service is not configured (Admin error: From Email missing). Please try again later.";
+    console.error(`[Email Action] ${errorMsg}`);
     return {
-      message: "Email service is not configured (Admin error: From Email). Please try again later.",
+      message: errorMsg,
       success: false,
     };
   }
@@ -196,27 +204,31 @@ export async function emailResultsAction(
 
   const msg = {
     to: email,
-    from: sendgridFromEmail, // Use the environment variable
+    from: sendgridFromEmail,
     subject: 'Your Lume Career Path Report',
-    text: resultsText, // SendGrid will automatically generate a text version from HTML if not provided
+    text: resultsText,
     html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${htmlContent}</div>`,
   };
 
+  console.log(`[Email Action] Sending email to: ${email} from: ${sendgridFromEmail}`);
+
   try {
     await sgMail.send(msg);
-    console.log(`Career path report successfully sent to ${email} via SendGrid.`);
+    console.log(`[Email Action] Career path report successfully sent to ${email} via SendGrid.`);
     return {
       message: `Career path successfully sent to ${email}!`,
       success: true,
     };
   } catch (error: any) {
-    console.error('Error sending email with SendGrid:', error);
+    console.error('[Email Action] Error sending email with SendGrid:', error);
     if (error.response) {
-      console.error('SendGrid Error Body:', error.response.body);
+      console.error('[Email Action] SendGrid Error Response Code:', error.code);
+      console.error('[Email Action] SendGrid Error Body:', JSON.stringify(error.response.body, null, 2));
     }
     return {
-      message: "Failed to send email. Please try again later or contact support if the issue persists.",
+      message: "Failed to send email. Please check server logs for details or contact support.",
       success: false,
     };
   }
 }
+
