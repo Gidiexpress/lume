@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { generateCareerPath, type CareerPathInput, type CareerPathOutput } from '@/ai/flows/career-path-generator';
 import { generatePremiumCareerPath, type PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator'; 
+import sgMail from '@sendgrid/mail';
 
 const CareerFormSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
@@ -17,8 +18,6 @@ const CareerFormSchema = z.object({
   reportType: z.enum(['free', 'premium'], { message: "Invalid report type selected." }),
 });
 
-// This input schema is used by generatePremiumReportAction when it receives direct object input
-// It should mirror CareerPathInput which is used by generatePremiumCareerPath
 const PremiumReportInputSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -44,7 +43,6 @@ export async function submitCareerFormAction(
   prevState: FormState | undefined,
   formData: FormData
 ): Promise<FormState> {
-  // This action is now only for FREE reports from the main form
   const validatedFields = CareerFormSchema.safeParse({
     fullName: formData.get('fullName'),
     email: formData.get('email'),
@@ -54,7 +52,7 @@ export async function submitCareerFormAction(
     desiredCareerPath: formData.get('desiredCareerPath'),
     learningPreference: formData.get('learningPreference'),
     additionalContext: formData.get('additionalContext'),
-    reportType: 'free', // Hardcode to free as this form is for free reports
+    reportType: 'free', 
   });
 
   if (!validatedFields.success) {
@@ -89,8 +87,14 @@ export async function submitCareerFormAction(
     };
   } catch (error) {
     console.error("Error generating free career path:", error);
+    let errorMessage = "Failed to generate free career path. Please try again later.";
+     if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+    } else if (typeof error === 'string') {
+        errorMessage = error;
+    }
     return {
-      message: "Failed to generate free career path. Please try again later.",
+      message: errorMessage,
       success: false,
       reportType: 'free',
     };
@@ -99,7 +103,7 @@ export async function submitCareerFormAction(
 
 export async function generatePremiumReportAction(
   prevState: FormState | undefined,
-  inputData: CareerPathInput // Accepts CareerPathInput directly
+  inputData: CareerPathInput
 ): Promise<FormState> {
   const validatedFields = PremiumReportInputSchema.safeParse(inputData);
 
@@ -112,12 +116,10 @@ export async function generatePremiumReportAction(
       reportType: 'premium',
     };
   }
-
-  // Payment is assumed to be handled by the client-side Paystack flow before this action is called.
+  
   console.log("Premium report requested for:", validatedFields.data.email);
 
   try {
-    // Pass validated data (which is of type CareerPathInput) to the premium career path generator
     const premiumCareerPath = await generatePremiumCareerPath(validatedFields.data as CareerPathInput);
     return {
       message: 'Premium career path generated successfully! Multiple paths suggested.',
@@ -170,14 +172,51 @@ export async function emailResultsAction(
   
   const { email, resultsText } = validatedFields.data;
 
-  console.log(`Emailing results to: ${email}`);
-  console.log(`Content:\n${resultsText}`);
-  
-  // Simulate email sending
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const sendgridApiKey = process.env.SENDGRID_API_KEY;
+  const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL;
 
-  return {
-    message: `Career path successfully sent to ${email}!`,
-    success: true,
+  if (!sendgridApiKey) {
+    console.error("SendGrid API Key is not configured. Set SENDGRID_API_KEY environment variable.");
+    return {
+      message: "Email service is not configured (Admin error). Please try again later.",
+      success: false,
+    };
+  }
+  if (!sendgridFromEmail) {
+    console.error("SendGrid From Email is not configured. Set SENDGRID_FROM_EMAIL environment variable.");
+    return {
+      message: "Email service is not configured (Admin error: From Email). Please try again later.",
+      success: false,
+    };
+  }
+
+  sgMail.setApiKey(sendgridApiKey);
+
+  const htmlContent = resultsText.replace(/\n/g, '<br>');
+
+  const msg = {
+    to: email,
+    from: sendgridFromEmail, // Use the environment variable
+    subject: 'Your Lume Career Path Report',
+    text: resultsText, // SendGrid will automatically generate a text version from HTML if not provided
+    html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${htmlContent}</div>`,
   };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Career path report successfully sent to ${email} via SendGrid.`);
+    return {
+      message: `Career path successfully sent to ${email}!`,
+      success: true,
+    };
+  } catch (error: any) {
+    console.error('Error sending email with SendGrid:', error);
+    if (error.response) {
+      console.error('SendGrid Error Body:', error.response.body);
+    }
+    return {
+      message: "Failed to send email. Please try again later or contact support if the issue persists.",
+      success: false,
+    };
+  }
 }

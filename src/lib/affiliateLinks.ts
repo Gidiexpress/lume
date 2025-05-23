@@ -9,7 +9,7 @@ export interface CourseLink {
 }
 
 let COURSE_AFFILIATE_LINKS_CACHE: CourseLink[] = [];
-let linksFetchedSuccessfully = false;
+let linksFetchedSuccessfully = true;
 let lastFetchTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
@@ -24,7 +24,7 @@ export async function fetchAndCacheAffiliateLinks(): Promise<void> {
   try {
     // console.log("Fetching affiliate links from Supabase...");
     const { data, error } = await supabase
-      .from('affiliateLinks') // Ensure this table name matches your Supabase table
+      .from('affiliatelinks') // Ensure this table name matches your Supabase table
       .select('id, title, affiliateUrl, displayText'); // Specify columns
 
     if (error) {
