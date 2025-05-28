@@ -1,13 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { supabase } from '@/lib/supabase/client';
-import { Loader2, LogIn, AlertTriangle, ShieldAlert } from 'lucide-react';
+import {
+  Loader2,
+  LogIn,
+  AlertTriangle,
+  ShieldAlert,
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminLoginPage() {
@@ -16,13 +28,14 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
+  const router = useRouter();
+
+  // Handle auth errors passed via query string
   useEffect(() => {
-    // Handle error messages from query parameters
-    const authErrorType = searchParams.get('error');
-    const authErrorMessage = searchParams.get('message');
+    const params = new URLSearchParams(window.location.search);
+    const authErrorType = params.get('error');
+    const authErrorMessage = params.get('message');
 
     if (authErrorMessage) {
       setError(decodeURIComponent(authErrorMessage));
@@ -32,14 +45,14 @@ export default function AdminLoginPage() {
       setError('Authorization Error: Could not verify admin privileges. Please contact support.');
     }
 
-    // Clear URL params
     if (authErrorType || authErrorMessage) {
-      router.replace(window.location.pathname);
+      const currentPath = window.location.pathname;
+      router.replace(currentPath);
     }
-  }, [searchParams, router]);
+  }, [router]);
 
+  // Check existing session or auth state changes
   useEffect(() => {
-    // Check if user is already logged in
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -49,7 +62,19 @@ export default function AdminLoginPage() {
       }
     };
 
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        router.replace('/admin');
+      } else {
+        setIsCheckingAuth(false);
+      }
+    });
+
     checkSession();
+
+    return () => {
+      authListener.subscription?.unsubscribe();
+    };
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -64,22 +89,22 @@ export default function AdminLoginPage() {
       });
 
       if (signInError) {
-        const message = signInError.message.includes('Invalid login credentials')
-          ? 'Invalid email or password. Please try again.'
-          : signInError.message || 'Failed to login. Please check your credentials.';
-        setError(message);
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please try again.');
+        } else {
+          setError(signInError.message);
+        }
         return;
       }
 
-      if (data.user) {
-        setError(null);
+      if (data?.user) {
         router.replace('/admin');
       } else {
         setError('Login failed. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during login.');
       console.error('Unexpected login error:', err);
+      setError(err.message || 'Unexpected error during login.');
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +128,6 @@ export default function AdminLoginPage() {
           </CardTitle>
           <CardDescription>Access to the Lume administration panel.</CardDescription>
         </CardHeader>
-
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -131,13 +155,19 @@ export default function AdminLoginPage() {
               />
             </div>
           </CardContent>
-
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90">
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="mr-2 h-4 w-4" />
+              )}
               Sign In
             </Button>
-
             {error && (
               <p className="text-sm text-destructive flex items-center p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -147,7 +177,6 @@ export default function AdminLoginPage() {
           </CardFooter>
         </form>
       </Card>
-
       <p className="mt-6 text-center text-sm text-muted-foreground">
         <Link href="/" className="hover:text-primary underline">
           Back to Lume Home
