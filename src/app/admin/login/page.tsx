@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -21,6 +20,7 @@ export default function AdminLoginPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Handle error messages from query parameters
     const authErrorType = searchParams.get('error');
     const authErrorMessage = searchParams.get('message');
 
@@ -31,46 +31,32 @@ export default function AdminLoginPage() {
     } else if (authErrorType === 'role_check_failed') {
       setError('Authorization Error: Could not verify admin privileges. Please contact support.');
     }
-    
+
+    // Clear URL params
     if (authErrorType || authErrorMessage) {
-      // Clear error from URL more reliably for App Router
-      const currentPath = window.location.pathname;
-      router.replace(currentPath, undefined); 
+      router.replace(window.location.pathname);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]); // router is stable and not needed if using window.location for path
+  }, [searchParams, router]);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Check if user is already logged in
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // User is logged in. Attempt to redirect to admin page.
-        // The /admin page will handle its own authorization logic (role check).
         router.replace('/admin');
       } else {
         setIsCheckingAuth(false);
       }
-    });
-
-    // Check initial auth state
-    const checkInitialSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            router.replace('/admin');
-        } else {
-            setIsCheckingAuth(false);
-        }
     };
-    checkInitialSession();
 
-    return () => {
-      authListener.subscription?.unsubscribe();
-    };
+    checkSession();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -78,26 +64,22 @@ export default function AdminLoginPage() {
       });
 
       if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please try again.');
-        } else {
-          setError(signInError.message || 'Failed to login. Please check your credentials.');
-        }
-        console.error("Supabase Login error:", signInError);
-        setIsLoading(false);
+        const message = signInError.message.includes('Invalid login credentials')
+          ? 'Invalid email or password. Please try again.'
+          : signInError.message || 'Failed to login. Please check your credentials.';
+        setError(message);
         return;
       }
 
       if (data.user) {
-        // Login successful from Supabase Auth perspective.
-        // Redirect to /admin which will then perform the role check.
+        setError(null);
         router.replace('/admin');
       } else {
-         setError('Login failed. Please try again.');
+        setError('Login failed. Please try again.');
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during login.');
-      console.error("Unexpected Login error:", err);
+      console.error('Unexpected login error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -119,10 +101,9 @@ export default function AdminLoginPage() {
             <ShieldAlert className="mr-2 h-6 w-6 text-primary" />
             Lume Admin Login
           </CardTitle>
-          <CardDescription>
-            Access to the Lume administration panel.
-          </CardDescription>
+          <CardDescription>Access to the Lume administration panel.</CardDescription>
         </CardHeader>
+
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -150,11 +131,13 @@ export default function AdminLoginPage() {
               />
             </div>
           </CardContent>
+
           <CardFooter className="flex flex-col items-center space-y-4">
             <Button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary/90">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
               Sign In
             </Button>
+
             {error && (
               <p className="text-sm text-destructive flex items-center p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -164,7 +147,8 @@ export default function AdminLoginPage() {
           </CardFooter>
         </form>
       </Card>
-       <p className="mt-6 text-center text-sm text-muted-foreground">
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         <Link href="/" className="hover:text-primary underline">
           Back to Lume Home
         </Link>
@@ -172,5 +156,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
-    
