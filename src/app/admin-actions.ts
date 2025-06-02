@@ -27,6 +27,27 @@ export interface UserProfileState {
   issues?: string[];
 }
 
+export interface UserAnalyticsData {
+  totalUsers: number;
+  newUsersThisWeek: number;
+  fieldsOfStudy: { name: string; value: number }[];
+  premiumVsFree: { premium: number; free: number };
+  topRecommendedPaths: { name: string; count: number }[];
+}
+
+export interface ReportInsightsData {
+  totalReportsGenerated: number;
+  premiumReportsDownloaded: number;
+  averageSkillReadiness: number;
+  topDownloadedByField: { field: string; downloads: number }[];
+}
+
+export interface AnalyticsActionState {
+  message: string | null;
+  success: boolean;
+  data?: UserAnalyticsData | ReportInsightsData | null;
+}
+
 
 // Fetch all affiliate links from Supabase
 export async function getAffiliateLinks(): Promise<AdminActionState> {
@@ -35,7 +56,7 @@ export async function getAffiliateLinks(): Promise<AdminActionState> {
     console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
     const { data, error } = await supabase
       .from('affiliateLinks')
-      .select('id, title, "affiliateUrl", "displayText", created_at') // Use quoted column names if they were created quoted
+      .select('id, title, "affiliateUrl", "displayText", created_at') 
       .order('title', { ascending: true });
 
     if (error) {
@@ -124,7 +145,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
 
     const { data: newLink, error: insertError } = await supabase
       .from('affiliateLinks')
-      .insert([{ title, affiliateUrl: affiliateUrl, displayText: displayText || null }]) // Ensure mapping matches DB column names
+      .insert([{ title, affiliateUrl: affiliateUrl, displayText: displayText || null }]) 
       .select('id, title, "affiliateUrl", "displayText", created_at')
       .single();
 
@@ -187,8 +208,6 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     };
   }
 
-  // Title cannot be updated via this form to maintain uniqueness and simplicity.
-  // Only affiliateUrl and displayText are updated.
   const { affiliateUrl, displayText } = validatedFields.data;
   const updatedData: { "affiliateUrl": string; "displayText": string | null } = { 
     "affiliateUrl": affiliateUrl, 
@@ -301,8 +320,6 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
   }
   const { fullName } = validatedFields.data;
   try {
-    // Note: RLS policies on 'profiles' table must allow the user to update their own 'full_name' and 'updated_at'.
-    // It should ideally prevent them from updating their 'role'.
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: fullName, updated_at: new Date().toISOString() })
@@ -314,8 +331,89 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
     }
     return { success: true, message: 'Profile updated successfully.' };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in updateUserProfile. Error:", JSON.stringify(error, null, 2));
+    console.error("Error updating user profile:", error);
     return { success: false, message: error.message || 'Failed to update profile.' };
   }
 }
+
+// Server action to get user analytics data
+export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
+  const supabase = createServerActionClient({ cookies });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, message: 'Authentication required to fetch analytics.' };
+  }
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (profileError || !profile || profile.role !== 'admin') {
+    return { success: false, message: 'Admin privileges required for analytics.' };
+  }
+
+  // TODO: Implement actual Supabase queries to fetch real data
+  // Example:
+  // const { count: totalUsers, error: userError } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+  // This is a placeholder. You'll need to create tables and log user activities.
+  const mockData: UserAnalyticsData = {
+    totalUsers: 0, // Replace with await supabase.from('users' or 'profiles').select('*', { count: 'exact', head: true }) -> count
+    newUsersThisWeek: 0, // Query users created in the last 7 days
+    fieldsOfStudy: [], // Aggregate from a 'user_inputs' or 'profiles' table if you store this
+    premiumVsFree: { premium: 0, free: 0 }, // Log report types generated
+    topRecommendedPaths: [], // Log paths recommended by AI
+  };
+
+  // Simulate fetching real data if you had a 'profiles' table
+  try {
+    const { count: totalUsersCount, error: usersError } = await supabase
+      .from('profiles') // Assuming 'profiles' table exists and each row is a user
+      .select('*', { count: 'exact', head: true });
+
+    if (usersError) {
+      console.error('Error fetching total users:', usersError);
+      // Fallback to mock data or partial data
+    } else {
+      mockData.totalUsers = totalUsersCount || 0;
+    }
+
+    // For other stats like newUsersThisWeek, fieldsOfStudy, etc.,
+    // you would need more specific tables or columns and queries.
+    // e.g., for newUsersThisWeek:
+    // const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // const { count: newUsersCount } = await supabase.from('auth.users').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo);
+    // mockData.newUsersThisWeek = newUsersCount || 0;
+
+    // This is still largely mock. True implementation requires proper data logging.
+    console.warn('[AdminAction] getUserAnalyticsData is returning partially mock data. Full implementation requires backend logging and queries.');
+    return { success: true, message: 'User analytics fetched (partially mock).', data: mockData };
+
+  } catch (error: any) {
+    console.error('Error fetching user analytics data:', error);
+    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: mockData }; // Return mock on error
+  }
+}
+
+// Server action to get report insights data
+export async function getReportInsightsData(): Promise<AnalyticsActionState> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+        return { success: false, message: 'Authentication required to fetch report insights.' };
+    }
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (profileError || !profile || profile.role !== 'admin') {
+        return { success: false, message: 'Admin privileges required for report insights.' };
+    }
+
+    // TODO: Implement actual Supabase queries.
+    // You would need a table to log every report generation (e.g., 'generated_reports')
+    // with columns like 'report_type' (free/premium), 'user_id', 'created_at', 'field_of_study', 'skill_readiness_score'.
+    const mockData: ReportInsightsData = {
+        totalReportsGenerated: 0, // COUNT(*) from generated_reports
+        premiumReportsDownloaded: 0, // COUNT(*) from generated_reports WHERE report_type = 'premium'
+        averageSkillReadiness: 0, // AVG(skill_readiness_score) from generated_reports WHERE report_type = 'premium'
+        topDownloadedByField: [], // GROUP BY field_of_study, COUNT(*) from generated_reports
+    };
     
+    console.warn('[AdminAction] getReportInsightsData is returning mock data. Full implementation requires backend logging and queries.');
+    return { success: true, message: 'Report insights fetched (mock data).', data: mockData };
+}

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Briefcase, Users, Lightbulb, ChevronRight, Target, Brain, Search, Github, ShieldCheck, Sparkles } from 'lucide-react';
+import { Briefcase, Users, Lightbulb, ChevronRight, Target, Brain, Search, Sparkles } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center space-x-2">
-            <Sparkles className="h-8 w-8 text-primary" /> {/* Changed icon */}
+            <Sparkles className="h-8 w-8 text-primary" />
             <span className="text-2xl font-bold">Lume</span>
           </Link>
           <nav className="flex items-center space-x-1 sm:space-x-2">
@@ -33,16 +33,6 @@ export default function LandingPage() {
               <Link href="/career-path">Get Started</Link>
             </Button>
             <ModeToggle />
-             <Button variant="ghost" size="icon" asChild>
-              <Link href="/admin" aria-label="Admin Dashboard">
-                <ShieldCheck className="h-5 w-5" />
-              </Link>
-            </Button>
-            <Button variant="ghost" size="icon" asChild>
-              <a href="https://github.com/firebase/genkit/tree/main/studio" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-                <Github className="h-5 w-5" />
-              </a>
-            </Button>
           </nav>
         </div>
       </header>
@@ -66,11 +56,11 @@ export default function LandingPage() {
             <div className="mt-16 px-4 sm:px-0">
               <Image
                 src="https://placehold.co/1200x600.png"
-                alt="Lume platform illustrating diverse career paths for students"
+                alt="Lume platform illustrating modern career development and technology"
                 width={1200}
                 height={600}
                 className="rounded-lg shadow-2xl mx-auto max-w-full h-auto"
-                data-ai-hint="career guidance students"
+                data-ai-hint="modern tech career"
                 priority
               />
             </div>
@@ -172,18 +162,8 @@ export default function LandingPage() {
       <footer className="py-8 border-t border-border bg-card">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Lume. Illuminating career paths for Nigerian Youths. All rights reserved.</p>
-           <div className="flex justify-center items-center space-x-4 mt-4">
-            <Button variant="link" asChild className="text-muted-foreground hover:text-primary">
-              <Link href="/admin">Admin</Link>
-            </Button>
-             <Button variant="link" asChild className="text-muted-foreground hover:text-primary">
-              <a href="https://github.com/firebase/genkit/tree/main/studio" target="_blank" rel="noopener noreferrer">GitHub</a>
-             </Button>
-          </div>
         </div>
       </footer>
     </div>
   );
 }
-
-    

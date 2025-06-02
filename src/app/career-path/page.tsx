@@ -8,7 +8,7 @@ import type { CareerPathInput, CareerPathOutput } from '@/ai/flows/career-path-g
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
 import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, AlertTriangle, ShieldCheck, Github } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -171,16 +171,6 @@ export default function CareerPathPage() {
           </Link>
           <div className="flex items-center space-x-2">
             <ModeToggle />
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/admin" aria-label="Admin Dashboard">
-                <ShieldCheck className="h-5 w-5" />
-              </Link>
-            </Button>
-            <Button variant="ghost" size="icon" asChild>
-              <a href="https://github.com/firebase/genkit/tree/main/studio" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-                <Github className="h-5 w-5" />
-              </a>
-            </Button>
           </div>
         </div>
       </header>
