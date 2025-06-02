@@ -60,7 +60,7 @@ export default function LandingPage() {
                 width={1200}
                 height={600}
                 className="rounded-lg shadow-2xl mx-auto max-w-full h-auto"
-                data-ai-hint="modern tech career"
+                data-ai-hint="career success presentation"
                 priority
               />
             </div>
