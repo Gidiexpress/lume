@@ -30,14 +30,23 @@ export async function fetchAndCacheAffiliateLinks(): Promise<void> {
       .select('id, title, "affiliateUrl", "displayText"'); // Column names "affiliateUrl" and "displayText" are quoted to preserve case.
 
     if (supabaseError) {
-      console.error("Supabase error details during affiliate link fetch:", {
-        message: supabaseError.message,
-        details: supabaseError.details,
-        hint: supabaseError.hint,
-        code: supabaseError.code,
-      });
+      console.error("Supabase error occurred. Raw error object:", supabaseError);
+      // Attempt to log individual known properties safely
+      const message = supabaseError.message || "No message property";
+      const code = supabaseError.code || "No code property";
+      const details = supabaseError.details || "No details property";
+      const hint = supabaseError.hint || "No hint property";
+      console.error(`Supabase Error Properties: Message: "${message}", Code: "${code}", Details: "${details}", Hint: "${hint}"`);
+      
+      // Try stringifying the error if the above isn't enough
+      try {
+        console.error("Full stringified Supabase error:", JSON.stringify(supabaseError, null, 2));
+      } catch (e) {
+        console.error("Could not stringify Supabase error object.");
+      }
+      
       // Throw a new standard Error for the catch block below
-      throw new Error(`Supabase fetch error: ${supabaseError.message} (Code: ${supabaseError.code})`);
+      throw new Error(`Supabase fetch error: ${message} (Code: ${code})`);
     }
     
     COURSE_AFFILIATE_LINKS_CACHE = data as CourseLink[];
@@ -46,21 +55,22 @@ export async function fetchAndCacheAffiliateLinks(): Promise<void> {
     // console.log("Affiliate links fetched from Supabase and cached:", COURSE_AFFILIATE_LINKS_CACHE);
   } catch (e: any) {
     let detailedMessage = "An unknown error occurred while fetching/caching affiliate links.";
-    if (e instanceof Error) {
+    // Try to extract a meaningful message from the error object
+    if (e instanceof Error && e.message) {
         detailedMessage = e.message;
-    } else if (typeof e === 'object' && e !== null && e.message) {
-        detailedMessage = e.message; // For objects that might have a message property
-    } else if (typeof e === 'string') {
+    } else if (typeof e === 'object' && e !== null && (e as any).message) {
+        detailedMessage = (e as any).message;
+    } else if (typeof e === 'string' && e) {
         detailedMessage = e;
     }
     
-    console.error("Error in fetchAndCacheAffiliateLinks:", detailedMessage);
-    // Log the full error object if it's not a standard Error, for more context
+    console.error("Error in fetchAndCacheAffiliateLinks (outer catch):", detailedMessage);
+    // Log the full error object if it's not a standard Error and wasn't already logged well
     if (!(e instanceof Error) && typeof e === 'object' && e !== null) {
         try {
-            console.error("Full caught object structure:", JSON.stringify(e, null, 2));
+            console.error("Full caught object structure in outer catch (if not Error instance):", JSON.stringify(e, null, 2));
         } catch (stringifyError) {
-            console.error("Full caught object (could not stringify):", e);
+            console.error("Full caught object in outer catch (could not stringify):", e);
         }
     }
     
@@ -81,3 +91,4 @@ export function findAffiliateLinkInCache(courseTitle: string): CourseLink | unde
   );
   return foundLink;
 }
+
