@@ -37,9 +37,9 @@ export interface UserAnalyticsData {
 
 export interface ReportInsightsData {
   totalReportsGenerated: number;
-  premiumReportsDownloaded: number;
+  premiumReportsGenerated: number; // Changed from downloaded to generated for clarity
   averageSkillReadiness: number;
-  topDownloadedByField: { field: string; downloads: number }[];
+  topGeneratedByField: { field: string; count: number }[]; // Changed for clarity
 }
 
 export interface AnalyticsActionState {
@@ -53,7 +53,7 @@ export interface AnalyticsActionState {
 export async function getAffiliateLinks(): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
   try {
-    console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
+    // console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
     const { data, error } = await supabase
       .from('affiliateLinks')
       .select('id, title, "affiliateUrl", "displayText", created_at') 
@@ -63,10 +63,10 @@ export async function getAffiliateLinks(): Promise<AdminActionState> {
       console.error("[AdminAction] Supabase error in getAffiliateLinks:", JSON.stringify(error, null, 2));
       throw error;
     }
-    console.log("[AdminAction] Affiliate links fetched successfully from Supabase.");
+    // console.log("[AdminAction] Affiliate links fetched successfully from Supabase.");
     return { success: true, message: 'Affiliate links fetched successfully.', data: data as CourseLink[] };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in getAffiliateLinks. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in getAffiliateLinks. Error:", JSON.stringify(error, null, 2));
     
     let clientErrorMessage = 'Failed to fetch affiliate links.';
     if (error.message) {
@@ -155,7 +155,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
     }
     return { success: true, message: 'Affiliate link added successfully.', data: newLink as CourseLink };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in addAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in addAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to add link: The operation violates the database security policy. Ensure your admin account has permissions to add to 'affiliateLinks'. (Error: ${error.message})` };
     }
@@ -231,7 +231,7 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
 
     return { success: true, message: 'Affiliate link updated successfully.', data: updatedLink as CourseLink };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in updateAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in updateAffiliateLink. Error:", JSON.stringify(error, null, 2));
      if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to update link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -279,7 +279,7 @@ export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminAct
     }
     return { success: true, message: 'Affiliate link deleted successfully.' };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in deleteAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in deleteAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to delete link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -331,10 +331,11 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
     }
     return { success: true, message: 'Profile updated successfully.' };
   } catch (error: any) {
-    console.error("Error updating user profile:", error);
-    return { success: false, message: error.message || 'Failed to update profile.' };
+      console.error("Error updating user profile:", error);
+      return { success: false, message: error.message || 'Failed to update profile.' };
+    }
   }
-}
+
 
 // Server action to get user analytics data
 export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
@@ -349,45 +350,101 @@ export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
     return { success: false, message: 'Admin privileges required for analytics.' };
   }
 
-  // TODO: Implement actual Supabase queries to fetch real data
-  // Example:
-  // const { count: totalUsers, error: userError } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-  // This is a placeholder. You'll need to create tables and log user activities.
-  const mockData: UserAnalyticsData = {
-    totalUsers: 0, // Replace with await supabase.from('users' or 'profiles').select('*', { count: 'exact', head: true }) -> count
-    newUsersThisWeek: 0, // Query users created in the last 7 days
-    fieldsOfStudy: [], // Aggregate from a 'user_inputs' or 'profiles' table if you store this
-    premiumVsFree: { premium: 0, free: 0 }, // Log report types generated
-    topRecommendedPaths: [], // Log paths recommended by AI
+  const analyticsData: UserAnalyticsData = {
+    totalUsers: 0,
+    newUsersThisWeek: 0,
+    fieldsOfStudy: [],
+    premiumVsFree: { premium: 0, free: 0 },
+    topRecommendedPaths: [],
   };
 
-  // Simulate fetching real data if you had a 'profiles' table
   try {
+    // Total Users
     const { count: totalUsersCount, error: usersError } = await supabase
-      .from('profiles') // Assuming 'profiles' table exists and each row is a user
+      .from('profiles')
       .select('*', { count: 'exact', head: true });
+    if (usersError) console.error('Error fetching total users:', JSON.stringify(usersError, null, 2));
+    else analyticsData.totalUsers = totalUsersCount || 0;
 
-    if (usersError) {
-      console.error('Error fetching total users:', usersError);
-      // Fallback to mock data or partial data
-    } else {
-      mockData.totalUsers = totalUsersCount || 0;
+    // New Users This Week
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { count: newUsersCount, error: newUsersError } = await supabase
+      .from('auth.users') // Using auth.users for creation timestamp
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', sevenDaysAgo);
+    if (newUsersError) console.error('Error fetching new users:', JSON.stringify(newUsersError, null, 2));
+    else analyticsData.newUsersThisWeek = newUsersCount || 0;
+
+    // Fields of Study (Top 5)
+    // Note: Direct GROUP BY and COUNT is complex with Supabase JS client.
+    // This is a simplified version. For true aggregation, an RPC function is better.
+    const { data: fieldsLogs, error: fieldsError } = await supabase
+      .from('user_activity_logs')
+      .select('field_of_study')
+      .neq('field_of_study', null) // Ensure field_of_study is not null
+      .limit(500); // Fetch a reasonable number of recent logs to process
+    
+    if (fieldsError) console.error('Error fetching fields of study logs:', JSON.stringify(fieldsError, null, 2));
+    else if (fieldsLogs) {
+      const fieldCounts: Record<string, number> = {};
+      fieldsLogs.forEach(log => {
+        if (log.field_of_study) {
+          fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
+        }
+      });
+      analyticsData.fieldsOfStudy = Object.entries(fieldCounts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+    }
+    
+    // Premium vs Free Reports Generated
+    const { data: reportTypeLogs, error: reportTypesError } = await supabase
+        .from('user_activity_logs')
+        .select('activity_type');
+    
+    if(reportTypesError) console.error('Error fetching report type logs:', JSON.stringify(reportTypesError, null, 2));
+    else if (reportTypeLogs) {
+        reportTypeLogs.forEach(log => {
+            if (log.activity_type === 'PREMIUM_REPORT_GENERATED') {
+                analyticsData.premiumVsFree.premium++;
+            } else if (log.activity_type === 'FREE_REPORT_GENERATED') {
+                analyticsData.premiumVsFree.free++;
+            }
+        });
     }
 
-    // For other stats like newUsersThisWeek, fieldsOfStudy, etc.,
-    // you would need more specific tables or columns and queries.
-    // e.g., for newUsersThisWeek:
-    // const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    // const { count: newUsersCount } = await supabase.from('auth.users').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo);
-    // mockData.newUsersThisWeek = newUsersCount || 0;
+    // Top Recommended Paths (Top 5)
+    // This is very complex with JSONB arrays. Simplification: count occurrences of the *first* path.
+    // An RPC function would be much better here for unnesting and counting.
+    const { data: pathLogs, error: pathError } = await supabase
+      .from('user_activity_logs')
+      .select('generated_path_names')
+      .neq('generated_path_names', null)
+      .limit(500);
 
-    // This is still largely mock. True implementation requires proper data logging.
-    console.warn('[AdminAction] getUserAnalyticsData is returning partially mock data. Full implementation requires backend logging and queries.');
-    return { success: true, message: 'User analytics fetched (partially mock).', data: mockData };
+    if (pathError) console.error('Error fetching path logs:', JSON.stringify(pathError, null, 2));
+    else if (pathLogs) {
+        const pathCounts: Record<string, number> = {};
+        pathLogs.forEach(log => {
+            if (log.generated_path_names && Array.isArray(log.generated_path_names) && log.generated_path_names.length > 0) {
+                const firstPath = log.generated_path_names[0];
+                if (typeof firstPath === 'string') {
+                     pathCounts[firstPath] = (pathCounts[firstPath] || 0) + 1;
+                }
+            }
+        });
+        analyticsData.topRecommendedPaths = Object.entries(pathCounts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a,b) => b.count - a.count)
+            .slice(0,5);
+    }
 
+
+    return { success: true, message: 'User analytics fetched successfully.', data: analyticsData };
   } catch (error: any) {
-    console.error('Error fetching user analytics data:', error);
-    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: mockData }; // Return mock on error
+    console.error('Error processing user analytics data:', JSON.stringify(error, null, 2));
+    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: analyticsData }; // Return partial/default on error
   }
 }
 
@@ -404,16 +461,71 @@ export async function getReportInsightsData(): Promise<AnalyticsActionState> {
         return { success: false, message: 'Admin privileges required for report insights.' };
     }
 
-    // TODO: Implement actual Supabase queries.
-    // You would need a table to log every report generation (e.g., 'generated_reports')
-    // with columns like 'report_type' (free/premium), 'user_id', 'created_at', 'field_of_study', 'skill_readiness_score'.
-    const mockData: ReportInsightsData = {
-        totalReportsGenerated: 0, // COUNT(*) from generated_reports
-        premiumReportsDownloaded: 0, // COUNT(*) from generated_reports WHERE report_type = 'premium'
-        averageSkillReadiness: 0, // AVG(skill_readiness_score) from generated_reports WHERE report_type = 'premium'
-        topDownloadedByField: [], // GROUP BY field_of_study, COUNT(*) from generated_reports
+    const insightsData: ReportInsightsData = {
+        totalReportsGenerated: 0,
+        premiumReportsGenerated: 0,
+        averageSkillReadiness: 0,
+        topGeneratedByField: [],
     };
-    
-    console.warn('[AdminAction] getReportInsightsData is returning mock data. Full implementation requires backend logging and queries.');
-    return { success: true, message: 'Report insights fetched (mock data).', data: mockData };
+
+    try {
+        // Total Reports Generated (Free + Premium)
+        const { count: totalCount, error: totalError } = await supabase
+            .from('user_activity_logs')
+            .select('*', { count: 'exact', head: true })
+            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED']);
+        if (totalError) console.error('Error fetching total reports count:', JSON.stringify(totalError, null, 2));
+        else insightsData.totalReportsGenerated = totalCount || 0;
+
+        // Premium Reports Generated
+        const { count: premiumCount, error: premiumError } = await supabase
+            .from('user_activity_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('activity_type', 'PREMIUM_REPORT_GENERATED');
+        if (premiumError) console.error('Error fetching premium reports count:', JSON.stringify(premiumError, null, 2));
+        else insightsData.premiumReportsGenerated = premiumCount || 0;
+
+        // Average Skill Readiness Score for Premium Reports
+        const { data: readinessScores, error: readinessError } = await supabase
+            .from('user_activity_logs')
+            .select('skill_readiness_score')
+            .eq('activity_type', 'PREMIUM_REPORT_GENERATED')
+            .neq('skill_readiness_score', null);
+
+        if (readinessError) console.error('Error fetching readiness scores:', JSON.stringify(readinessError, null, 2));
+        else if (readinessScores && readinessScores.length > 0) {
+            const sum = readinessScores.reduce((acc, curr) => acc + (curr.skill_readiness_score || 0), 0);
+            insightsData.averageSkillReadiness = parseFloat((sum / readinessScores.length).toFixed(1));
+        }
+        
+        // Top Reports Generated by Field of Study (Top 5)
+        // Similar to user analytics, direct GROUP BY is hard. Using client-side aggregation from fetched logs.
+        // An RPC is highly recommended for this in production.
+        const { data: fieldLogs, error: fieldLogsError } = await supabase
+            .from('user_activity_logs')
+            .select('field_of_study')
+            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED'])
+            .neq('field_of_study', null)
+            .limit(1000); // Fetch a good sample or all if feasible
+
+        if (fieldLogsError) console.error('Error fetching field logs for report insights:', JSON.stringify(fieldLogsError, null, 2));
+        else if (fieldLogs) {
+            const fieldCounts: Record<string, number> = {};
+            fieldLogs.forEach(log => {
+                 if (log.field_of_study) {
+                    fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
+                }
+            });
+            insightsData.topGeneratedByField = Object.entries(fieldCounts)
+                .map(([field, count]) => ({ field, count }))
+                .sort((a,b) => b.count - a.count)
+                .slice(0,5);
+        }
+
+        return { success: true, message: 'Report insights fetched successfully.', data: insightsData };
+
+    } catch (error: any) {
+        console.error('Error processing report insights data:', JSON.stringify(error, null, 2));
+        return { success: false, message: `Failed to fetch report insights: ${error.message}`, data: insightsData };
+    }
 }
