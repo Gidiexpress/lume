@@ -2,10 +2,10 @@
 import { supabase } from '@/lib/supabase/client'; // Import Supabase client
 
 export interface CourseLink {
-  id?: string; // Supabase typically uses string UUIDs for 'id' if auto-generated
+  id?: string; 
   title: string; 
-  affiliateUrl: string; // Ensure this matches your Supabase column name (e.g., affiliate_url)
-  displayText?: string; // Ensure this matches your Supabase column name (e.g., display_text)
+  affiliateUrl: string; 
+  displayText?: string; 
 }
 
 let COURSE_AFFILIATE_LINKS_CACHE: CourseLink[] = [];
@@ -23,20 +23,47 @@ export async function fetchAndCacheAffiliateLinks(): Promise<void> {
   }
   try {
     // console.log("Fetching affiliate links from Supabase...");
-    const { data, error } = await supabase
-      .from('affiliatelinks') // Ensure this table name matches your Supabase table
-      .select('id, title, affiliateUrl, displayText'); // Specify columns
+    // Ensure table name 'affiliatelinks' (all lowercase) matches your actual Supabase table name.
+    // If your table was created with quotes like CREATE TABLE "affiliateLinks", then use 'affiliateLinks'.
+    const { data, error: supabaseError } = await supabase
+      .from('affiliatelinks') 
+      .select('id, title, "affiliateUrl", "displayText"'); // Column names "affiliateUrl" and "displayText" are quoted to preserve case.
 
-    if (error) {
-      throw error;
+    if (supabaseError) {
+      console.error("Supabase error details during affiliate link fetch:", {
+        message: supabaseError.message,
+        details: supabaseError.details,
+        hint: supabaseError.hint,
+        code: supabaseError.code,
+      });
+      // Throw a new standard Error for the catch block below
+      throw new Error(`Supabase fetch error: ${supabaseError.message} (Code: ${supabaseError.code})`);
     }
     
     COURSE_AFFILIATE_LINKS_CACHE = data as CourseLink[];
     linksFetchedSuccessfully = true;
     lastFetchTimestamp = now;
     // console.log("Affiliate links fetched from Supabase and cached:", COURSE_AFFILIATE_LINKS_CACHE);
-  } catch (error) {
-    console.error("Error fetching and caching affiliate links from Supabase:", error);
+  } catch (e: any) {
+    let detailedMessage = "An unknown error occurred while fetching/caching affiliate links.";
+    if (e instanceof Error) {
+        detailedMessage = e.message;
+    } else if (typeof e === 'object' && e !== null && e.message) {
+        detailedMessage = e.message; // For objects that might have a message property
+    } else if (typeof e === 'string') {
+        detailedMessage = e;
+    }
+    
+    console.error("Error in fetchAndCacheAffiliateLinks:", detailedMessage);
+    // Log the full error object if it's not a standard Error, for more context
+    if (!(e instanceof Error) && typeof e === 'object' && e !== null) {
+        try {
+            console.error("Full caught object structure:", JSON.stringify(e, null, 2));
+        } catch (stringifyError) {
+            console.error("Full caught object (could not stringify):", e);
+        }
+    }
+    
     linksFetchedSuccessfully = false; // Allow refetch on next attempt if this one failed
   }
 }
@@ -47,8 +74,6 @@ export function findAffiliateLinkInCache(courseTitle: string): CourseLink | unde
   if (!courseTitle) {
     return undefined;
   }
-  // It's okay if linksFetchedSuccessfully is false here; it means the cache might be empty or stale,
-  // and find will just return undefined, which is handled by the caller.
   
   const normalizedCourseTitle = courseTitle.toLowerCase().trim();
   const foundLink = COURSE_AFFILIATE_LINKS_CACHE.find(
