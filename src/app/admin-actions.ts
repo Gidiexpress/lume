@@ -37,9 +37,9 @@ export interface UserAnalyticsData {
 
 export interface ReportInsightsData {
   totalReportsGenerated: number;
-  premiumReportsGenerated: number; // Changed from downloaded to generated for clarity
+  premiumReportsGenerated: number; 
   averageSkillReadiness: number;
-  topGeneratedByField: { field: string; count: number }[]; // Changed for clarity
+  topGeneratedByField: { field: string; count: number }[]; 
 }
 
 export interface AnalyticsActionState {
@@ -340,13 +340,24 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
 // Server action to get user analytics data
 export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
   const supabase = createServerActionClient({ cookies });
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = data?.user;
 
-  if (authError || !user) {
-    return { success: false, message: 'Authentication required to fetch analytics.' };
+  if (authError) {
+    console.error('[AdminAction/getUserAnalyticsData] Supabase auth.getUser() error:', JSON.stringify(authError, null, 2));
+    return { success: false, message: `Authentication error (Analytics): ${authError.message}. Please refresh or log in again.` };
   }
+  if (!user) {
+    console.error('[AdminAction/getUserAnalyticsData] No authenticated user found for analytics.');
+    return { success: false, message: 'Analytics: User session not found. Please refresh or log in again.' };
+  }
+
   const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profileError || !profile || profile.role !== 'admin') {
+  if (profileError) {
+    console.error('[AdminAction/getUserAnalyticsData] Error fetching admin profile:', JSON.stringify(profileError, null, 2));
+    return { success: false, message: `Error fetching admin profile (Analytics): ${profileError.message}.` };
+  }
+  if (!profile || profile.role !== 'admin') {
     return { success: false, message: 'Admin privileges required for analytics.' };
   }
 
@@ -369,71 +380,48 @@ export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
     // New Users This Week
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { count: newUsersCount, error: newUsersError } = await supabase
-      .from('auth.users') // Using auth.users for creation timestamp
+      .from('auth.users') 
       .select('*', { count: 'exact', head: true })
       .gte('created_at', sevenDaysAgo);
     if (newUsersError) console.error('Error fetching new users:', JSON.stringify(newUsersError, null, 2));
     else analyticsData.newUsersThisWeek = newUsersCount || 0;
-
-    // Fields of Study (Top 5)
-    // Note: Direct GROUP BY and COUNT is complex with Supabase JS client.
-    // This is a simplified version. For true aggregation, an RPC function is better.
-    const { data: fieldsLogs, error: fieldsError } = await supabase
-      .from('user_activity_logs')
-      .select('field_of_study')
-      .neq('field_of_study', null) // Ensure field_of_study is not null
-      .limit(500); // Fetch a reasonable number of recent logs to process
     
-    if (fieldsError) console.error('Error fetching fields of study logs:', JSON.stringify(fieldsError, null, 2));
-    else if (fieldsLogs) {
-      const fieldCounts: Record<string, number> = {};
-      fieldsLogs.forEach(log => {
-        if (log.field_of_study) {
-          fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
-        }
-      });
-      analyticsData.fieldsOfStudy = Object.entries(fieldCounts)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-    }
-    
-    // Premium vs Free Reports Generated
-    const { data: reportTypeLogs, error: reportTypesError } = await supabase
+    const { data: activityLogs, error: logsError } = await supabase
         .from('user_activity_logs')
-        .select('activity_type');
-    
-    if(reportTypesError) console.error('Error fetching report type logs:', JSON.stringify(reportTypesError, null, 2));
-    else if (reportTypeLogs) {
-        reportTypeLogs.forEach(log => {
+        .select('activity_type, field_of_study, generated_path_names')
+        .limit(1000); // Fetch a sample of logs for client-side aggregation
+
+    if (logsError) {
+        console.error('Error fetching user_activity_logs:', JSON.stringify(logsError, null, 2));
+    } else if (activityLogs) {
+        const fieldCounts: Record<string, number> = {};
+        const pathCounts: Record<string, number> = {};
+
+        activityLogs.forEach(log => {
+            // Premium vs Free
             if (log.activity_type === 'PREMIUM_REPORT_GENERATED') {
                 analyticsData.premiumVsFree.premium++;
             } else if (log.activity_type === 'FREE_REPORT_GENERATED') {
                 analyticsData.premiumVsFree.free++;
             }
-        });
-    }
 
-    // Top Recommended Paths (Top 5)
-    // This is very complex with JSONB arrays. Simplification: count occurrences of the *first* path.
-    // An RPC function would be much better here for unnesting and counting.
-    const { data: pathLogs, error: pathError } = await supabase
-      .from('user_activity_logs')
-      .select('generated_path_names')
-      .neq('generated_path_names', null)
-      .limit(500);
+            // Fields of Study
+            if (log.field_of_study) {
+                fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
+            }
 
-    if (pathError) console.error('Error fetching path logs:', JSON.stringify(pathError, null, 2));
-    else if (pathLogs) {
-        const pathCounts: Record<string, number> = {};
-        pathLogs.forEach(log => {
+            // Top Recommended Paths (first path)
             if (log.generated_path_names && Array.isArray(log.generated_path_names) && log.generated_path_names.length > 0) {
                 const firstPath = log.generated_path_names[0];
-                if (typeof firstPath === 'string') {
-                     pathCounts[firstPath] = (pathCounts[firstPath] || 0) + 1;
+                 if (typeof firstPath === 'string') {
+                    pathCounts[firstPath] = (pathCounts[firstPath] || 0) + 1;
                 }
             }
         });
+        analyticsData.fieldsOfStudy = Object.entries(fieldCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
         analyticsData.topRecommendedPaths = Object.entries(pathCounts)
             .map(([name, count]) => ({ name, count }))
             .sort((a,b) => b.count - a.count)
@@ -444,20 +432,31 @@ export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
     return { success: true, message: 'User analytics fetched successfully.', data: analyticsData };
   } catch (error: any) {
     console.error('Error processing user analytics data:', JSON.stringify(error, null, 2));
-    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: analyticsData }; // Return partial/default on error
+    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: analyticsData }; 
   }
 }
 
 // Server action to get report insights data
 export async function getReportInsightsData(): Promise<AnalyticsActionState> {
     const supabase = createServerActionClient({ cookies });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data, error: authError } = await supabase.auth.getUser();
+    const user = data?.user;
 
-    if (authError || !user) {
-        return { success: false, message: 'Authentication required to fetch report insights.' };
+    if (authError) {
+        console.error('[AdminAction/getReportInsightsData] Supabase auth.getUser() error:', JSON.stringify(authError, null, 2));
+        return { success: false, message: `Authentication error (Report Insights): ${authError.message}. Please refresh or log in again.` };
     }
+    if (!user) {
+        console.error('[AdminAction/getReportInsightsData] No authenticated user found for report insights.');
+        return { success: false, message: 'Report Insights: User session not found. Please refresh or log in again.' };
+    }
+
     const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (profileError || !profile || profile.role !== 'admin') {
+    if (profileError) {
+        console.error('[AdminAction/getReportInsightsData] Error fetching admin profile:', JSON.stringify(profileError, null, 2));
+        return { success: false, message: `Error fetching admin profile (Report Insights): ${profileError.message}.` };
+    }
+    if (!profile || profile.role !== 'admin') {
         return { success: false, message: 'Admin privileges required for report insights.' };
     }
 
@@ -469,54 +468,36 @@ export async function getReportInsightsData(): Promise<AnalyticsActionState> {
     };
 
     try {
-        // Total Reports Generated (Free + Premium)
-        const { count: totalCount, error: totalError } = await supabase
+        const { data: reportLogs, error: logsError } = await supabase
             .from('user_activity_logs')
-            .select('*', { count: 'exact', head: true })
-            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED']);
-        if (totalError) console.error('Error fetching total reports count:', JSON.stringify(totalError, null, 2));
-        else insightsData.totalReportsGenerated = totalCount || 0;
+            .select('activity_type, field_of_study, skill_readiness_score')
+            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED']); // Fetch all relevant logs
 
-        // Premium Reports Generated
-        const { count: premiumCount, error: premiumError } = await supabase
-            .from('user_activity_logs')
-            .select('*', { count: 'exact', head: true })
-            .eq('activity_type', 'PREMIUM_REPORT_GENERATED');
-        if (premiumError) console.error('Error fetching premium reports count:', JSON.stringify(premiumError, null, 2));
-        else insightsData.premiumReportsGenerated = premiumCount || 0;
-
-        // Average Skill Readiness Score for Premium Reports
-        const { data: readinessScores, error: readinessError } = await supabase
-            .from('user_activity_logs')
-            .select('skill_readiness_score')
-            .eq('activity_type', 'PREMIUM_REPORT_GENERATED')
-            .neq('skill_readiness_score', null);
-
-        if (readinessError) console.error('Error fetching readiness scores:', JSON.stringify(readinessError, null, 2));
-        else if (readinessScores && readinessScores.length > 0) {
-            const sum = readinessScores.reduce((acc, curr) => acc + (curr.skill_readiness_score || 0), 0);
-            insightsData.averageSkillReadiness = parseFloat((sum / readinessScores.length).toFixed(1));
-        }
-        
-        // Top Reports Generated by Field of Study (Top 5)
-        // Similar to user analytics, direct GROUP BY is hard. Using client-side aggregation from fetched logs.
-        // An RPC is highly recommended for this in production.
-        const { data: fieldLogs, error: fieldLogsError } = await supabase
-            .from('user_activity_logs')
-            .select('field_of_study')
-            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED'])
-            .neq('field_of_study', null)
-            .limit(1000); // Fetch a good sample or all if feasible
-
-        if (fieldLogsError) console.error('Error fetching field logs for report insights:', JSON.stringify(fieldLogsError, null, 2));
-        else if (fieldLogs) {
+        if (logsError) {
+            console.error('Error fetching report logs for insights:', JSON.stringify(logsError, null, 2));
+        } else if (reportLogs) {
+            let totalSkillScore = 0;
+            let premiumReportCountForAvg = 0;
             const fieldCounts: Record<string, number> = {};
-            fieldLogs.forEach(log => {
-                 if (log.field_of_study) {
+
+            reportLogs.forEach(log => {
+                insightsData.totalReportsGenerated++;
+                if (log.activity_type === 'PREMIUM_REPORT_GENERATED') {
+                    insightsData.premiumReportsGenerated++;
+                    if (log.skill_readiness_score !== null && log.skill_readiness_score !== undefined) {
+                        totalSkillScore += log.skill_readiness_score;
+                        premiumReportCountForAvg++;
+                    }
+                }
+                if (log.field_of_study) {
                     fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
                 }
             });
-            insightsData.topGeneratedByField = Object.entries(fieldCounts)
+
+            if (premiumReportCountForAvg > 0) {
+                insightsData.averageSkillReadiness = parseFloat((totalSkillScore / premiumReportCountForAvg).toFixed(1));
+            }
+             insightsData.topGeneratedByField = Object.entries(fieldCounts)
                 .map(([field, count]) => ({ field, count }))
                 .sort((a,b) => b.count - a.count)
                 .slice(0,5);
@@ -529,3 +510,5 @@ export async function getReportInsightsData(): Promise<AnalyticsActionState> {
         return { success: false, message: `Failed to fetch report insights: ${error.message}`, data: insightsData };
     }
 }
+
+```
