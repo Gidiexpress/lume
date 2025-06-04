@@ -10,31 +10,33 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { submitCareerFormAction, type FormState } from '@/app/actions';
-import type { CareerPathOutput, CareerPathInput } from '@/ai/flows/career-path-generator';
+import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
+import type { CareerPathInput } from '@/ai/flows/career-path-generator';
 import { Loader2, GraduationCap, Target, AlertTriangle, Sparkles, User, Mail, Building, Briefcase, BookOpen, MessageSquarePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CareerFormProps {
-  onFormSubmitSuccess: (data: CareerPathOutput, originalInput: CareerPathInput, reportType: 'free' | 'premium') => void;
-  onFormSubmitError: (message: string) => void; // Changed to non-optional
+  onFormSubmitSuccess: (data: PremiumCareerPathOutput, originalInput: CareerPathInput, reportType: 'premium') => void;
+  onFormSubmitError: (message: string) => void;
 }
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" name="reportType" value="free" disabled={pending} className="w-full bg-primary hover:bg-primary/90">
+    <Button type="submit" disabled={pending} className="w-full bg-primary hover:bg-primary/90">
       {pending ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
       ) : (
         <Sparkles className="mr-2 h-4 w-4" />
       )}
-      Get Your Free Career Summary
+      Get Your Career Report
     </Button>
   );
 }
 
 export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFormProps) {
-  const initialState: FormState = { message: null, success: false, data: null, reportType: 'free' };
+  // reportType is now always 'premium' from the action
+  const initialState: FormState = { message: null, success: false, data: null, reportType: 'premium' };
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
 
@@ -42,8 +44,9 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
 
   useEffect(() => {
     if (state?.message) {
-      if (state.success && state.data && state.reportType === 'free' && formDataCache) {
-        onFormSubmitSuccess(state.data as CareerPathOutput, formDataCache, state.reportType);
+      // Expects PremiumCareerPathOutput now
+      if (state.success && state.data && state.reportType === 'premium' && formDataCache) {
+        onFormSubmitSuccess(state.data as PremiumCareerPathOutput, formDataCache, state.reportType);
         toast({
           title: 'Success!',
           description: state.message,
@@ -84,7 +87,7 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
           Discover Your Career Path with Lume
         </CardTitle>
         <CardDescription className="text-center">
-          Fill in your details to get a free personalized career summary.
+          Fill in your details to get your personalized career report.
         </CardDescription>
       </CardHeader>
       <form action={handleFormAction}>
@@ -159,7 +162,7 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-4">
           <SubmitButton />
-          <input type="hidden" name="reportType" value="free" />
+          {/* Removed hidden reportType input */}
           {state?.message && !state.success && (
             <p className="text-sm text-destructive flex items-center mt-4 p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />

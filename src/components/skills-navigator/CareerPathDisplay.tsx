@@ -1,20 +1,22 @@
 
 'use client';
 
-import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
+// Removed: import type { CareerPathOutput } from '@/ai/flows/career-path-generator';
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
 import { SectionCard } from './SectionCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { fetchAndCacheAffiliateLinks, findAffiliateLinkInCache } from '@/lib/affiliateLinks'; // Updated import
+import { fetchAndCacheAffiliateLinks, findAffiliateLinkInCache } from '@/lib/affiliateLinks';
 import { Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
-  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, Zap, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, ChevronsRight, HandHelping, Rocket
+  Briefcase, CodeXml, Users, Laptop, BookOpenCheck, Lightbulb, Copy, Mail, Loader2, AlertTriangle, Sparkles, Award, CheckCircle, BarChart2, Users2, BookCopy, FileText, Globe, Target as TargetIcon, GraduationCap, ExternalLink, Palette, TrendingUp, DollarSign, ShieldQuestion, Info, BookMarked, ChevronsRight
 } from 'lucide-react';
+// Removed Rocket and HandHelping as they were for the free report's encouragement section
+// Removed Zap as it was tied to the upgrade CTA
 import Link from 'next/link';
 import React from 'react'; 
-import { useFormStatus } from 'react-dom'; // Corrected: useFormStatus from react-dom
+import { useFormStatus } from 'react-dom';
 import { emailResultsAction, type EmailFormState } from '@/app/actions';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
@@ -23,10 +25,10 @@ import { Progress } from '@/components/ui/progress';
 
 
 interface CareerPathDisplayProps {
-  data: CareerPathOutput | PremiumCareerPathOutput;
-  reportType: 'free' | 'premium';
-  onUpgradeToPremium: () => void;
-  isPremiumLoading: boolean;
+  data: PremiumCareerPathOutput; // Now always expects PremiumCareerPathOutput
+  reportType: 'premium'; // Type is fixed to 'premium'
+  // onUpgradeToPremium prop removed
+  // isPremiumLoading prop removed
 }
 
 function formatSinglePremiumReportForCopy(report: PremiumCareerPathOutput['suggestedCareerPaths'][0]['detailedReport']): string {
@@ -63,7 +65,6 @@ function formatSinglePremiumReportForCopy(report: PremiumCareerPathOutput['sugge
 
   text += `== Learning Resources ==\n`;
   report.learningResources.forEach(res => {
-    // For copy, we might not resolve affiliate links, just use the AI suggested URL or search term
     const linkInfo = res.urlSuggestion ? ` (Link/Search: ${res.urlSuggestion})` : '';
     text += `- ${res.title} – ${res.platform}${linkInfo} ${res.isFree ? '(Free)' : '(Paid)'}\n`;
   });
@@ -107,59 +108,25 @@ function formatSinglePremiumReportForCopy(report: PremiumCareerPathOutput['sugge
   return text;
 }
 
-function formatSingleFreePathForCopy(path: CareerPathOutput['suggestedCareerPaths'][0]): string {
-  let text = `Path: ${path.pathName}\n`;
-  text += `  Overview: ${path.overview}\n`;
-  text += `  Reason it Fits: ${path.reasonItFits}\n`;
-  text += `  Typical Responsibilities:\n    - ${path.typicalResponsibilities.join('\n    - ')}\n`;
-  text += `  Essential Skills to Start:\n    - ${path.essentialSkillsToStart.join('\n    - ')}\n`;
-  text += `  Learning Resources:\n`;
-  path.learningResources.forEach(res => {
-    // For copy, use the AI suggested link or search term
-    const linkInfo = res.link ? ` (Link/Search: ${res.link})` : '';
-    text += `    - ${res.title} – ${res.platform}${linkInfo}\n`;
-  });
-  text += "\n";
-  return text;
-}
+// formatSingleFreePathForCopy is removed as free report is no longer the primary display type.
 
-
-function formatResultsForCopy(data: CareerPathOutput | PremiumCareerPathOutput, reportType: 'free' | 'premium'): string {
-  let text = `Lume - Your ${reportType === 'premium' ? 'Premium Multi-Path' : 'Free Summary'} Career Report\n\n`;
+function formatResultsForCopy(data: PremiumCareerPathOutput): string {
+  let text = `Lume - Your Comprehensive Career Report\n\n`;
   
-  if (reportType === 'premium') {
-    const premiumData = data as PremiumCareerPathOutput;
-    if (premiumData.suggestedCareerPaths && premiumData.suggestedCareerPaths.length > 0) {
-      text += `Lume has identified the following career paths for you based on your profile:\n`;
-      premiumData.suggestedCareerPaths.forEach((path, index) => {
-        text += `\n**************************************************\n`;
-        text += `PATH ${index + 1}: ${path.pathName}\n`;
-        text += `**************************************************\n`;
-        text += `Summary: ${path.summary}\n`;
-        text += formatSinglePremiumReportForCopy(path.detailedReport);
-      });
-    } else {
-      text += "No career paths were suggested in this premium report.\n";
-    }
-  } else { // Free report
-      const freeData = data as CareerPathOutput;
-      text += "Here are some career paths Lume suggests for you based on your field of study:\n\n";
-      if (freeData.suggestedCareerPaths && freeData.suggestedCareerPaths.length > 0) {
-        freeData.suggestedCareerPaths.forEach((path, index) => {
-          text += `--- Career Path ${index + 1} ---\n`;
-          text += formatSingleFreePathForCopy(path);
-        });
-        text += `\n== Encouragement & Advice ==\n${freeData.encouragementAndAdvice}\n`;
-      } else {
-        text += "No career paths were suggested in this free report.\n";
-        if (freeData.encouragementAndAdvice) {
-           text += `\n== Encouragement & Advice ==\n${freeData.encouragementAndAdvice}\n`;
-        }
-      }
+  if (data.suggestedCareerPaths && data.suggestedCareerPaths.length > 0) {
+    text += `Lume has identified the following career paths for you based on your profile:\n`;
+    data.suggestedCareerPaths.forEach((path, index) => {
+      text += `\n**************************************************\n`;
+      text += `PATH ${index + 1}: ${path.pathName}\n`;
+      text += `**************************************************\n`;
+      text += `Summary: ${path.summary}\n`;
+      text += formatSinglePremiumReportForCopy(path.detailedReport);
+    });
+  } else {
+    text += "No career paths were suggested in this report.\n";
   }
   return text;
 }
-
 
 function EmailSubmitButton() {
   const { pending } = useFormStatus();
@@ -171,16 +138,13 @@ function EmailSubmitButton() {
   );
 }
 
-
-export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPremiumLoading }: CareerPathDisplayProps) {
+export function CareerPathDisplay({ data }: CareerPathDisplayProps) {
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [activeAccordionItem, setActiveAccordionItem] = React.useState<string | undefined>(undefined);
   const [affiliateLinksLoaded, setAffiliateLinksLoaded] = React.useState(false);
 
-
   const initialEmailState: EmailFormState = { message: null, success: false };
-  // useActionState should be imported from 'react' for client components in recent React versions
   const [emailFormState, dispatchEmailAction] = React.useActionState(emailResultsAction, initialEmailState);
   
   React.useEffect(() => {
@@ -195,9 +159,9 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     return () => {
       isMounted = false;
     };
-  }, []); // Runs once on mount
+  }, []);
 
-  const resultsTextForEmail = React.useMemo(() => formatResultsForCopy(data, reportType), [data, reportType]);
+  const resultsTextForEmail = React.useMemo(() => formatResultsForCopy(data), [data]);
 
   React.useEffect(() => {
     if (emailFormState?.message) {
@@ -212,25 +176,19 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     }
   }, [emailFormState, toast]);
 
-  const premiumData = reportType === 'premium' ? data as PremiumCareerPathOutput : null;
-  const freeData = reportType === 'free' ? data as CareerPathOutput : null;
-
-
   React.useEffect(() => {
-    if (reportType === 'premium' && premiumData?.suggestedCareerPaths?.length) {
-      setActiveAccordionItem(`path-${0}`); 
-    } else if (reportType === 'free' && freeData?.suggestedCareerPaths?.length) {
-       setActiveAccordionItem(`free-path-0`); 
+    if (data?.suggestedCareerPaths?.length) {
+      setActiveAccordionItem(`path-0`); 
     }
-  }, [data, reportType, premiumData?.suggestedCareerPaths, freeData?.suggestedCareerPaths]); 
+  }, [data?.suggestedCareerPaths]); 
 
   const handleCopyToClipboard = () => {
-    const textToCopy = formatResultsForCopy(data, reportType);
+    const textToCopy = formatResultsForCopy(data);
     navigator.clipboard.writeText(textToCopy)
       .then(() => {
         toast({
           title: "Copied to Clipboard!",
-          description: `Your ${reportType} career path results have been copied.`,
+          description: `Your career path results have been copied.`,
         });
       })
       .catch(err => {
@@ -243,7 +201,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
       });
   };
   
-
   const renderListItem = (item: string, index: number) => <li key={index} className="text-sm">{item}</li>;
   
   const renderDetailedReport = (report: PremiumCareerPathOutput['suggestedCareerPaths'][0]['detailedReport']) => {
@@ -317,7 +274,6 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
           <SectionCard title="Curated Learning Resources" icon={BookCopy}>
             <div className="space-y-3">
               {report.learningResources.map((res, index) => {
-                // Use findAffiliateLinkInCache only if affiliateLinksLoaded is true
                 const affiliateLink = affiliateLinksLoaded ? findAffiliateLinkInCache(res.title) : undefined;
                 const finalUrl = affiliateLink ? affiliateLink.affiliateUrl : (res.urlSuggestion && res.urlSuggestion.startsWith('http') ? res.urlSuggestion : `https://www.google.com/search?q=${encodeURIComponent(res.title + " " + res.platform)}`);
                 const linkText = affiliateLink ? (affiliateLink.displayText || res.title) : res.title;
@@ -438,77 +394,19 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
     );
   };
 
-  const renderFreeReportPath = (path: CareerPathOutput['suggestedCareerPaths'][0], pathIndex: number) => {
-    return (
-        <AccordionItem value={`free-path-${pathIndex}`} key={`free-path-${pathIndex}`}>
-            <AccordionTrigger className="text-lg font-medium hover:no-underline">
-                <div className="flex flex-col text-left">
-                    <span>{pathIndex + 1}. {path.pathName}</span>
-                </div>
-            </AccordionTrigger>
-            <AccordionContent className="space-y-6 pt-4 pl-2">
-                <SectionCard title="Path Overview" icon={Info}>
-                    <p className="text-foreground/90 mb-2">{path.overview}</p>
-                    <p className="text-sm text-muted-foreground"><strong>Why it fits your background:</strong> {path.reasonItFits}</p>
-                </SectionCard>
-
-                <SectionCard title="What You'll Be Doing" icon={Briefcase}>
-                    <ul className="list-disc list-inside space-y-1 text-foreground/80">
-                        {path.typicalResponsibilities.map(renderListItem)}
-                    </ul>
-                </SectionCard>
-
-                <SectionCard title="Essential Skills to Start" icon={CodeXml}>
-                     <ul className="list-disc list-inside space-y-1 text-foreground/80">
-                        {path.essentialSkillsToStart.map(renderListItem)}
-                    </ul>
-                </SectionCard>
-
-                <SectionCard title="How to Start Learning" icon={Rocket}>
-                    <div className="space-y-3">
-                        {path.learningResources.map((res, index) => {
-                            const affiliateLinkObj = affiliateLinksLoaded ? findAffiliateLinkInCache(res.title) : undefined;
-                            const finalUrl = affiliateLinkObj ? affiliateLinkObj.affiliateUrl : (res.link || `https://www.google.com/search?q=${encodeURIComponent(res.title + " " + res.platform)}`);
-                            const linkText = affiliateLinkObj ? (affiliateLinkObj.displayText || res.title) : res.title;
-                            return (
-                                <div key={`free-learn-${path.pathName}-${index}`} className="p-3 border rounded-md bg-background/50 hover:shadow-md transition-shadow">
-                                    <h5 className="font-semibold">{linkText}</h5>
-                                    <p className="text-sm text-muted-foreground">Platform: {res.platform}</p>
-                                    <a href={finalUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline inline-flex items-center">
-                                        {affiliateLinkObj ? "View Course (Partner)" : (res.link ? "Visit Link" : "Search Resource")}
-                                        <ExternalLink className="ml-1 h-3 w-3" />
-                                    </a>
-                                    {affiliateLinkObj && <Badge variant="outline" className="ml-2 border-primary/50 text-primary text-xs">Partner Link</Badge>}
-                                </div>
-                            );
-                        })}
-                        {!affiliateLinksLoaded && <p className="text-xs text-muted-foreground">Loading affiliate link information...</p>}
-                    </div>
-                </SectionCard>
-            </AccordionContent>
-        </AccordionItem>
-    );
-  };
-
+  // Removed free report rendering logic. Display now focuses on Premium Output.
 
   return (
     <div className="space-y-8 mt-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border rounded-lg bg-card shadow">
         <div className="flex items-center">
-          {reportType === 'premium' ? (
-            <Award className="h-8 w-8 text-primary mr-3" />
-          ) : (
-            <Sparkles className="h-8 w-8 text-primary mr-3" />
-          )}
+          <Award className="h-8 w-8 text-primary mr-3" />
           <div>
             <h2 className="text-2xl font-semibold">
-              Your {reportType === 'premium' ? 'Premium Multi-Path' : 'Free Career'} Report
+              Your Comprehensive Career Report
             </h2>
-             {reportType === 'free' && (
-                <p className="text-sm text-muted-foreground">Here are some career paths based on your field of study. Explore them below!</p>
-            )}
-             {reportType === 'premium' && premiumData?.suggestedCareerPaths && (
-                <p className="text-sm text-muted-foreground">Lume has identified {premiumData.suggestedCareerPaths.length} potential career paths for you. Explore each below.</p>
+            {data?.suggestedCareerPaths && (
+              <p className="text-sm text-muted-foreground">Lume has identified {data.suggestedCareerPaths.length} potential career paths for you. Explore each below.</p>
             )}
           </div>
         </div>
@@ -519,118 +417,51 @@ export function CareerPathDisplay({ data, reportType, onUpgradeToPremium, isPrem
         </div>
       </div>
       
-      {/* FREE REPORT DISPLAY */}
-      {freeData && reportType === 'free' && (
-        <>
-          {freeData.suggestedCareerPaths && freeData.suggestedCareerPaths.length > 0 ? (
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center text-xl">
-                        <ChevronsRight className="mr-2 h-6 w-6 text-primary"/>
-                        Suggested Career Paths
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Accordion 
-                        type="single" 
-                        collapsible 
-                        className="w-full" 
-                        value={activeAccordionItem}
-                        onValueChange={setActiveAccordionItem}
-                    >
-                        {freeData.suggestedCareerPaths.map(renderFreeReportPath)}
-                    </Accordion>
-                </CardContent>
-            </Card>
-          ) : (
-             <SectionCard title="Career Path Suggestions" icon={Info}>
-                <p className="text-muted-foreground">No specific career paths were suggested in your free report. This might be due to the input provided or an issue with the generation. Please try again or refine your input.</p>
-            </SectionCard>
-          )}
-
-          {freeData.encouragementAndAdvice && (
-            <SectionCard title="Encouragement & Next Steps" icon={HandHelping} className="bg-secondary/30 dark:bg-secondary/20">
-              <p className="text-foreground/90 whitespace-pre-line">{freeData.encouragementAndAdvice}</p>
-            </SectionCard>
-          )}
-        </>
-      )}
-      
       {/* PREMIUM REPORT DISPLAY (MULTI-PATH) */}
-      {premiumData && reportType === 'premium' && (
-        premiumData.suggestedCareerPaths && premiumData.suggestedCareerPaths.length > 0 ? (
-          <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center text-xl">
-                        <BookMarked className="mr-2 h-6 w-6 text-primary"/>
-                        Your Personalized Career Path Suggestions
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground mb-4">
-                        We've analyzed your profile and identified the following career paths as strong potential fits for you. Explore each one to see a detailed breakdown.
-                    </p>
-                    <Accordion 
-                        type="single" 
-                        collapsible 
-                        className="w-full" 
-                        value={activeAccordionItem}
-                        onValueChange={setActiveAccordionItem}
-                    >
-                        {premiumData.suggestedCareerPaths.map((path, index) => (
-                        <AccordionItem value={`path-${index}`} key={`path-${index}`}>
-                            <AccordionTrigger className="text-lg hover:no-underline">
-                                <div className="flex flex-col text-left">
-                                    <span>{index + 1}. {path.pathName}</span>
-                                    <span className="text-sm font-normal text-muted-foreground mt-1 pr-2">{path.summary}</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                {renderDetailedReport(path.detailedReport)}
-                            </AccordionContent>
-                        </AccordionItem>
-                        ))}
-                    </Accordion>
-                </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <SectionCard title="Premium Report" icon={Info}>
-            <p className="text-muted-foreground">No specific career paths were suggested in your premium report. This might be an issue with the generation process. Please try again or contact support if the problem persists.</p>
-          </SectionCard>
-        )
+      {data && data.suggestedCareerPaths && data.suggestedCareerPaths.length > 0 ? (
+        <div className="space-y-6">
+          <Card>
+              <CardHeader>
+                  <CardTitle className="flex items-center text-xl">
+                      <BookMarked className="mr-2 h-6 w-6 text-primary"/>
+                      Your Personalized Career Path Suggestions
+                  </CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                      We've analyzed your profile and identified the following career paths as strong potential fits for you. Explore each one to see a detailed breakdown.
+                  </p>
+                  <Accordion 
+                      type="single" 
+                      collapsible 
+                      className="w-full" 
+                      value={activeAccordionItem}
+                      onValueChange={setActiveAccordionItem}
+                  >
+                      {data.suggestedCareerPaths.map((path, index) => (
+                      <AccordionItem value={`path-${index}`} key={`path-${index}`}>
+                          <AccordionTrigger className="text-lg hover:no-underline">
+                              <div className="flex flex-col text-left">
+                                  <span>{index + 1}. {path.pathName}</span>
+                                  <span className="text-sm font-normal text-muted-foreground mt-1 pr-2">{path.summary}</span>
+                              </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                              {renderDetailedReport(path.detailedReport)}
+                          </AccordionContent>
+                      </AccordionItem>
+                      ))}
+                  </Accordion>
+              </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <SectionCard title="Career Report" icon={Info}>
+          <p className="text-muted-foreground">No specific career paths were suggested in your report. This might be an issue with the generation process. Please try again or contact support if the problem persists.</p>
+        </SectionCard>
       )}
 
-       {/* This card appears AFTER the free report content */}
-      {freeData && reportType === 'free' && (
-        <Card className="bg-primary/5 border-primary/20 shadow-lg dark:bg-primary/10 mt-12">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary flex items-center">
-              <Zap className="mr-2 h-6 w-6" />
-              Unlock Your Full Potential!
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-foreground/90">
-              You've got a starting point! Elevate your career planning with our Premium Report. Get multiple tailored career path suggestions, each with a detailed roadmap, skill gap analysis, curated learning resources, project ideas, resume tips, and Nigerian job market insights.
-            </p>
-            <Button 
-              size="lg" 
-              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-md" 
-              onClick={onUpgradeToPremium}
-              disabled={isPremiumLoading}
-            >
-              {isPremiumLoading ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-5 w-5" />
-              )}
-              Upgrade to Premium Report (₦1000)
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {/* Upgrade to Premium CTA removed */}
 
       <SectionCard title="Email These Results" icon={Mail} className="bg-secondary/30 dark:bg-secondary/20">
          <form action={dispatchEmailAction} className="space-y-4">
