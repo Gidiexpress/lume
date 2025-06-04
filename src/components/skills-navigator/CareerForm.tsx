@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 interface CareerFormProps {
   onFormSubmitSuccess: (data: PremiumCareerPathOutput, originalInput: CareerPathInput, reportType: 'premium') => void;
   onFormSubmitError: (message: string) => void;
+  onFormSubmitStart?: () => void; // New prop to signal start of submission
 }
 
 function SubmitButton() {
@@ -34,8 +35,7 @@ function SubmitButton() {
   );
 }
 
-export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFormProps) {
-  // reportType is now always 'premium' from the action
+export function CareerForm({ onFormSubmitSuccess, onFormSubmitError, onFormSubmitStart }: CareerFormProps) {
   const initialState: FormState = { message: null, success: false, data: null, reportType: 'premium' };
   const [state, formAction] = useActionState(submitCareerFormAction, initialState);
   const { toast } = useToast();
@@ -44,7 +44,6 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
 
   useEffect(() => {
     if (state?.message) {
-      // Expects PremiumCareerPathOutput now
       if (state.success && state.data && state.reportType === 'premium' && formDataCache) {
         onFormSubmitSuccess(state.data as PremiumCareerPathOutput, formDataCache, state.reportType);
         toast({
@@ -75,6 +74,7 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
         additionalContext: formData.get('additionalContext') as string || undefined,
     };
     setFormDataCache(currentInput);
+    onFormSubmitStart?.(); // Call the onFormSubmitStart callback
     formAction(formData);
   };
 
@@ -162,7 +162,6 @@ export function CareerForm({ onFormSubmitSuccess, onFormSubmitError }: CareerFor
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-4">
           <SubmitButton />
-          {/* Removed hidden reportType input */}
           {state?.message && !state.success && (
             <p className="text-sm text-destructive flex items-center mt-4 p-3 bg-destructive/10 rounded-md border border-destructive/30">
                 <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />

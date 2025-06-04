@@ -6,20 +6,18 @@ import { CareerForm } from '@/components/skills-navigator/CareerForm';
 import { CareerPathDisplay } from '@/components/skills-navigator/CareerPathDisplay';
 import type { CareerPathInput } from '@/ai/flows/career-path-generator';
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
-// Removed: import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-// Removed: import { PaymentModal } from '@/components/skills-navigator/PaymentModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function CareerPathPage() {
   const [currentReportData, setCurrentReportData] = useState<PremiumCareerPathOutput | null>(null);
   const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false); // For the main form submission
+  const [isGenerating, setIsGenerating] = useState(false); 
   
   const { toast } = useToast();
 
@@ -27,27 +25,25 @@ export default function CareerPathPage() {
     document.title = 'Career Path Generator | Lume';
   }, []);
 
-  // This function now handles the success of the main form, which generates the premium report
   const handleFormSubmitSuccess = (data: PremiumCareerPathOutput, originalInput: CareerPathInput) => {
     setCurrentReportData(data);
     setOriginalFormInput(originalInput);
     setFormError(null);
-    setIsGenerating(false); // Form submission is complete
+    setIsGenerating(false); 
   };
 
   const handleFormSubmitError = (errorMessage: string) => {
     setFormError(errorMessage);
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    setIsGenerating(false); // Form submission ended with error
+    setIsGenerating(false); 
   };
   
-  // Simulating the start of generation when CareerForm calls its internal action
-  // This is a bit of a placeholder as direct loading state from CareerForm's useActionState is tricky to pass up.
-  // A more robust solution might involve a shared context or Zustand for loading state if it needs to be precise.
-  // For now, we assume any `onFormSubmitError` or `onFormSubmitSuccess` means loading has finished.
-  // The CareerForm's internal submit button will show its own pending state.
-  // This `isGenerating` is now more conceptual for the page-level display.
+  const handleFormSubmitStart = () => {
+    setIsGenerating(true);
+    setFormError(null); // Clear previous errors when starting a new generation
+    setCurrentReportData(null); // Clear previous report data
+  };
 
   const handleReset = () => {
     setCurrentReportData(null);
@@ -56,9 +52,8 @@ export default function CareerPathPage() {
     setIsGenerating(false);
   };
 
-  // Determine what to display
   let contentToDisplay;
-  if (isGenerating) { // This state might be true if we decide to set it when the form is submitted
+  if (isGenerating) {
     contentToDisplay = (
       <Card className="w-full max-w-md mx-auto shadow-xl my-12">
         <CardHeader className="text-center">
@@ -69,7 +64,7 @@ export default function CareerPathPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center">
-            Hang tight! Our system is working to generate your detailed career guidance. This might take a moment.
+            Hang tight! Our AI is working to generate your detailed career guidance. This might take a few moments.
           </p>
           <div className="w-full bg-muted rounded-full h-2.5 my-6 overflow-hidden">
             <div className="bg-primary h-2.5 rounded-full animate-pulse w-full"></div>
@@ -96,9 +91,7 @@ export default function CareerPathPage() {
       <section id="results-display" className="max-w-3xl mx-auto">
         <CareerPathDisplay 
           data={currentReportData} 
-          reportType='premium' // Always premium now
-          // onUpgradeToPremium is removed
-          // isPremiumLoading is removed
+          reportType='premium'
         />
         <div className="mt-8 text-center">
           <Button onClick={handleReset} variant="outline" size="lg">
@@ -113,7 +106,7 @@ export default function CareerPathPage() {
         <CareerForm 
           onFormSubmitSuccess={handleFormSubmitSuccess}
           onFormSubmitError={handleFormSubmitError}
-          // Conceptual: onFormSubmitStart={() => setIsGenerating(true)}
+          onFormSubmitStart={handleFormSubmitStart} // Pass the new callback
         />
       </section>
     );
@@ -135,7 +128,6 @@ export default function CareerPathPage() {
 
       <main className="flex-grow container mx-auto px-4 py-8">
         {contentToDisplay}
-        {/* PaymentModal removed */}
       </main>
 
       <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
