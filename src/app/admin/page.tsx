@@ -50,11 +50,11 @@ export default function AdminPage() {
             description = 'Network Error: Could not connect to Supabase to verify admin role. Please check your internet connection and ensure Supabase URL/Anon Key are correct in your .env.local file.';
             toast({ title: 'Network Error', description, variant: 'destructive', duration: 10000 });
         } else if (profileError.code === 'PGRST116') { // "Searched for one row, but found 0"
-          description = 'Your user profile was not found in the "profiles" table, or the "role" column is missing/empty. Admin role cannot be verified. Please contact support or check Supabase setup.';
-          toast({ title: 'Profile Not Found for Role Check', description, variant: 'destructive', duration: 10000 });
-        } else if (profileError.message && profileError.message.includes('infinite recursion')) {
-          description = 'Supabase RLS Policy Error: Infinite recursion detected in a policy for the "profiles" table. Please check your RLS policies. The policy for reading your own profile should be: `(auth.uid() = id)`.';
-           toast({ title: 'RLS Policy Error', description, variant: 'destructive', duration: 10000 });
+          description = 'Your user profile was not found in the "profiles" table, or your RLS policies prevent reading it. Ensure your admin user has a profile with role="admin" and that RLS policy "Allow individual read access to own profile" is active and correct. Admin role cannot be verified. Please contact support or check Supabase setup.';
+          toast({ title: 'Profile Not Found or Inaccessible for Role Check', description, variant: 'destructive', duration: 15000 });
+        } else if (profileError.message && (profileError.message.includes('infinite recursion') || profileError.code === '42P17') ) {
+          description = 'Supabase RLS Policy Error: Infinite recursion detected in a policy for the "profiles" table (Error 42P17). Please check your RLS policies. The policy for reading your own profile should be specific (auth.uid() = id). Policies allowing admins to select all profiles must use subqueries that can be resolved by this specific policy to avoid loops. Refer to the Admin Dashboard Setup Checklist card for detailed RLS examples to fix this.';
+           toast({ title: 'RLS Policy Error (Infinite Recursion)', description, variant: 'destructive', duration: 15000 });
         } else {
           toast({ title: 'Authorization Error', description: `${description} (Error: ${profileError.message || 'Unknown Supabase error'})`, variant: 'destructive', duration: 10000 });
         }
@@ -62,7 +62,8 @@ export default function AdminPage() {
         await supabase.auth.signOut().catch(console.error);
         setIsAuthorized(false);
         const errorType = profileError.message && profileError.message.toLowerCase().includes('failed to fetch') ? 'network_error' 
-                        : profileError.code === 'PGRST116' ? 'profile_not_found' 
+                        : profileError.code === 'PGRST116' ? 'profile_not_found_or_rls' 
+                        : profileError.message && (profileError.message.includes('infinite recursion') || profileError.code === '42P17') ? 'rls_recursion'
                         : 'role_check_failed';
         router.replace(`/admin/login?error=${errorType}&message=${encodeURIComponent(description)}`);
         return false;
@@ -225,20 +226,46 @@ export default function AdminPage() {
                     </li>
                     <li>
                         <strong>Row Level Security (RLS) for `profiles`:</strong>
-                        <ul className="list-circle list-inside pl-5 text-xs mt-1">
+                        <ul className="list-circle list-inside pl-5 text-xs mt-1 space-y-1">
                             <li>Enable RLS on the <code>profiles</code> table.</li>
-                            <li>Policy for users to read their own profile: <code>CREATE POLICY "Allow individual read access to own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);</code></li>
-                            <li>(Optional but recommended) Policies for creating/updating profiles, ensuring users cannot change their own role without authorization.</li>
+                            <li>
+                                Crucial Policy for Users to Read Their Own Profile:
+                                <pre className="mt-1 mb-1 p-1.5 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">
+{`CREATE POLICY "Allow individual read access to own profile"
+ON public.profiles FOR SELECT TO authenticated
+USING (auth.uid() = id);`}
+                                </pre>
+                                This policy is specific and non-recursive. It's vital for resolving role checks without loops. If you can't log in as admin, ensure this policy is active and your admin user's `id` in `profiles` matches `auth.uid()` and `role` is `'admin'`.
+                            </li>
+                            <li>
+                                Policy for Admins to Read All Profiles (Example):
+                                 <pre className="mt-1 mb-1 p-1.5 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">
+{`CREATE POLICY "Admins can read all profiles"
+ON public.profiles FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles p_check
+    WHERE p_check.id = auth.uid() AND p_check.role = 'admin'
+  )
+);`}
+                                </pre>
+                                The subquery `EXISTS (...)` here will be resolved by the "Allow individual read access to own profile" policy for the `p_check` on `auth.uid()`, thus avoiding recursion.
+                            </li>
+                            <li>
+                                <strong>Avoiding Infinite Recursion (Error 42P17):</strong>
+                                The error occurs if a broad `SELECT` policy on `profiles` (e.g., an admin policy to select all profiles) has a `USING` clause that *itself* requires reading `profiles` in a way that re-triggers the same broad policy. The structure above with a specific "read own profile" policy and admin policies referencing it correctly helps prevent this.
+                                Using JWT custom claims for role checks in RLS (e.g., `auth.jwt()->>'user_role' = 'admin'`) is another robust way to avoid table lookups for role verification within RLS, if you configure custom claims.
+                            </li>
                         </ul>
                     </li>
                      <li>
                         <strong>Network Access:</strong> Ensure your browser and deployment environment can reach your Supabase project URL. Check for firewalls, proxies, or ad-blockers if you encounter "Failed to fetch" errors.
                     </li>
                     <li>
-                        <strong>RLS for other tables (e.g., `affiliateLinks`):</strong> Ensure RLS policies on other tables like <code>affiliateLinks</code> correctly use <code>(EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'))</code> in their <code>USING</code> and <code>WITH CHECK</code> clauses for admin-only operations. Avoid self-referencing RLS policies on the <code>profiles</code> table that could cause infinite recursion.
+                        <strong>RLS for other tables (e.g., `affiliateLinks`, `user_activity_logs`):</strong> Ensure RLS policies on these tables correctly use `(EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'))` in their `USING` and `WITH CHECK` clauses for admin-only operations. These subqueries rely on the non-recursive "Allow individual read access to own profile" policy on `profiles`.
                     </li>
                 </ul>
-                <p className="mt-3">If you are seeing "Failed to fetch" errors, verify your internet connection and Supabase URL/keys first. If you see "Profile Not Found" or "Access Denied" due to role, verify the <code>profiles</code> table data and RLS policies.</p>
+                <p className="mt-3">If you see "Failed to fetch" errors, verify your internet connection and Supabase URL/keys. If you see "Profile Not Found" or "Access Denied" due to role, verify `profiles` table data and RLS (especially the "Allow individual read access to own profile" policy). For "Infinite Recursion" (42P17), meticulously review your `SELECT` RLS policies on the `profiles` table using the examples above as a guide.</p>
             </CardContent>
         </Card>
 
@@ -295,3 +322,4 @@ export default function AdminPage() {
     </div>
   );
 }
+

@@ -1,117 +1,70 @@
 
 'use client';
 
-import React, { useState, useEffect, useActionState, startTransition } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CareerForm } from '@/components/skills-navigator/CareerForm';
 import { CareerPathDisplay } from '@/components/skills-navigator/CareerPathDisplay';
-import type { CareerPathInput, CareerPathOutput } from '@/ai/flows/career-path-generator';
+import type { CareerPathInput } from '@/ai/flows/career-path-generator';
 import type { PremiumCareerPathOutput } from '@/ai/flows/premium-career-report-generator';
-import { generatePremiumReportAction, type FormState as PremiumFormActionState } from '@/app/actions';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, AlertTriangle, ShieldCheck, Github } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { PaymentModal } from '@/components/skills-navigator/PaymentModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function CareerPathPage() {
-  const [currentReportData, setCurrentReportData] = useState<CareerPathOutput | PremiumCareerPathOutput | null>(null);
+  const [currentReportData, setCurrentReportData] = useState<PremiumCareerPathOutput | null>(null);
   const [originalFormInput, setOriginalFormInput] = useState<CareerPathInput | null>(null);
-  const [freeReportError, setFreeReportError] = useState<string | null>(null);
-  const [currentReportType, setCurrentReportType] = useState<'free' | 'premium' | null>(null);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false); 
   
   const { toast } = useToast();
-
-  const initialPremiumState: PremiumFormActionState = { message: null, success: false, data: null, reportType: 'premium' };
-  const [premiumState, premiumFormAction, isPremiumGenerating] = useActionState(generatePremiumReportAction, initialPremiumState);
 
   useEffect(() => {
     document.title = 'Career Path Generator | Lume';
   }, []);
 
-  const handleFreeFormSubmitSuccess = (data: CareerPathOutput, originalInput: CareerPathInput, type: 'free' | 'premium') => {
+  const handleFormSubmitSuccess = (data: PremiumCareerPathOutput, originalInput: CareerPathInput) => {
     setCurrentReportData(data);
     setOriginalFormInput(originalInput);
-    setCurrentReportType(type as 'free'); // Free report is always 'free' type from form
-    setFreeReportError(null);
+    setFormError(null);
+    setIsGenerating(false); 
   };
 
-  const handleFreeFormSubmitError = (errorMessage: string) => {
-    setFreeReportError(errorMessage);
+  const handleFormSubmitError = (errorMessage: string) => {
+    setFormError(errorMessage);
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    setCurrentReportType(null);
+    setIsGenerating(false); 
   };
-
-  useEffect(() => {
-    if (premiumState?.message && !isPremiumGenerating) { 
-      if (premiumState.success && premiumState.data) {
-        setCurrentReportData(premiumState.data as PremiumCareerPathOutput);
-        setCurrentReportType('premium');
-        toast({
-          title: 'Premium Report Generated!',
-          description: premiumState.message,
-        });
-        // Payment modal is now closed before generation starts
-      } else if (!premiumState.success) {
-        toast({
-          title: 'Premium Generation Failed',
-          description: premiumState.message || "Could not generate premium report.",
-          variant: 'destructive',
-        });
-      }
-    }
-  }, [premiumState, toast, isPremiumGenerating]);
-
-  const handleUpgradeToPremiumRequest = () => {
-    if (originalFormInput) {
-      setIsPaymentModalOpen(true); 
-    } else {
-      toast({
-        title: 'Error',
-        description: 'Original form data is missing. Cannot generate premium report.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // This function is called by PaymentModal after Paystack's onSuccess
-  const handleConfirmPaymentAndGenerateReport = () => {
-    if (originalFormInput) {
-      setIsPaymentModalOpen(false); // Close Lume payment modal immediately
-      startTransition(() => {
-        premiumFormAction(originalFormInput); // Start AI call
-      });
-    }
+  
+  const handleFormSubmitStart = () => {
+    setIsGenerating(true);
+    setFormError(null); // Clear previous errors when starting a new generation
+    setCurrentReportData(null); // Clear previous report data
   };
 
   const handleReset = () => {
     setCurrentReportData(null);
     setOriginalFormInput(null);
-    setFreeReportError(null);
-    setCurrentReportType(null);
-    setIsPaymentModalOpen(false);
+    setFormError(null);
+    setIsGenerating(false);
   };
 
-  const premiumErrorFromAction = !isPremiumGenerating && premiumState && !premiumState.success ? premiumState.message : null;
-  const displayError = freeReportError || premiumErrorFromAction;
-
-  // Determine what to display
   let contentToDisplay;
-  if (isPremiumGenerating) {
+  if (isGenerating) {
     contentToDisplay = (
       <Card className="w-full max-w-md mx-auto shadow-xl my-12">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold flex items-center justify-center">
             <Loader2 className="mr-3 h-8 w-8 animate-spin text-primary" />
-            Crafting Your Premium Report...
+            Crafting Your Career Report...
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center">
-            Hang tight! Our system is working its magic to generate your detailed, multi-path career guidance. This might take a moment.
+            Hang tight! Our AI is working to generate your detailed career guidance. This might take a few moments.
           </p>
           <div className="w-full bg-muted rounded-full h-2.5 my-6 overflow-hidden">
             <div className="bg-primary h-2.5 rounded-full animate-pulse w-full"></div>
@@ -122,25 +75,23 @@ export default function CareerPathPage() {
         </CardContent>
       </Card>
     );
-  } else if (displayError) {
+  } else if (formError) {
     contentToDisplay = (
       <div className="text-center p-6 bg-destructive/10 text-destructive rounded-md shadow max-w-md mx-auto border border-destructive/30">
         <div className="flex items-center justify-center mb-3">
           <AlertTriangle className="h-6 w-6 mr-2" />
           <p className="font-semibold text-lg">Report Generation Failed</p>
         </div>
-        <p className="mb-4">{displayError}</p>
+        <p className="mb-4">{formError}</p>
         <Button onClick={handleReset} variant="destructive" className="mt-4">Try Again</Button>
       </div>
     );
-  } else if (currentReportData && currentReportType) {
+  } else if (currentReportData) {
     contentToDisplay = (
       <section id="results-display" className="max-w-3xl mx-auto">
         <CareerPathDisplay 
           data={currentReportData} 
-          reportType={currentReportType}
-          onUpgradeToPremium={handleUpgradeToPremiumRequest}
-          isPremiumLoading={isPremiumGenerating}
+          reportType='premium'
         />
         <div className="mt-8 text-center">
           <Button onClick={handleReset} variant="outline" size="lg">
@@ -153,13 +104,13 @@ export default function CareerPathPage() {
     contentToDisplay = (
       <section id="input-form" className="mb-12 flex flex-col items-center">
         <CareerForm 
-          onFormSubmitSuccess={handleFreeFormSubmitSuccess}
-          onFormSubmitError={handleFreeFormSubmitError}
+          onFormSubmitSuccess={handleFormSubmitSuccess}
+          onFormSubmitError={handleFormSubmitError}
+          onFormSubmitStart={handleFormSubmitStart} // Pass the new callback
         />
       </section>
     );
   }
-
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -171,32 +122,12 @@ export default function CareerPathPage() {
           </Link>
           <div className="flex items-center space-x-2">
             <ModeToggle />
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/admin" aria-label="Admin Dashboard">
-                <ShieldCheck className="h-5 w-5" />
-              </Link>
-            </Button>
-            <Button variant="ghost" size="icon" asChild>
-              <a href="https://github.com/firebase/genkit/tree/main/studio" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-                <Github className="h-5 w-5" />
-              </a>
-            </Button>
           </div>
         </div>
       </header>
 
       <main className="flex-grow container mx-auto px-4 py-8">
         {contentToDisplay}
-
-        {isPaymentModalOpen && originalFormInput && (
-          <PaymentModal
-            isOpen={isPaymentModalOpen}
-            onClose={() => setIsPaymentModalOpen(false)}
-            onConfirmPayment={handleConfirmPaymentAndGenerateReport} 
-            isLoading={isPremiumGenerating} 
-            userEmail={originalFormInput.email}
-          />
-        )}
       </main>
 
       <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">

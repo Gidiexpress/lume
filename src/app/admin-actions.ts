@@ -27,25 +27,46 @@ export interface UserProfileState {
   issues?: string[];
 }
 
+export interface UserAnalyticsData {
+  totalUsers: number;
+  newUsersThisWeek: number;
+  fieldsOfStudy: { name: string; value: number }[];
+  premiumVsFree: { premium: number; free: number };
+  topRecommendedPaths: { name: string; count: number }[];
+}
+
+export interface ReportInsightsData {
+  totalReportsGenerated: number;
+  premiumReportsGenerated: number; 
+  averageSkillReadiness: number;
+  topGeneratedByField: { field: string; count: number }[]; 
+}
+
+export interface AnalyticsActionState {
+  message: string | null;
+  success: boolean;
+  data?: UserAnalyticsData | ReportInsightsData | null;
+}
+
 
 // Fetch all affiliate links from Supabase
 export async function getAffiliateLinks(): Promise<AdminActionState> {
   const supabase = createServerActionClient({ cookies });
   try {
-    console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
+    // console.log("[AdminAction] Attempting to fetch affiliate links from Supabase...");
     const { data, error } = await supabase
       .from('affiliateLinks')
-      .select('id, title, "affiliateUrl", "displayText", created_at') // Use quoted column names if they were created quoted
+      .select('id, title, "affiliateUrl", "displayText", created_at') 
       .order('title', { ascending: true });
 
     if (error) {
       console.error("[AdminAction] Supabase error in getAffiliateLinks:", JSON.stringify(error, null, 2));
       throw error;
     }
-    console.log("[AdminAction] Affiliate links fetched successfully from Supabase.");
+    // console.log("[AdminAction] Affiliate links fetched successfully from Supabase.");
     return { success: true, message: 'Affiliate links fetched successfully.', data: data as CourseLink[] };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in getAffiliateLinks. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in getAffiliateLinks. Error:", JSON.stringify(error, null, 2));
     
     let clientErrorMessage = 'Failed to fetch affiliate links.';
     if (error.message) {
@@ -124,7 +145,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
 
     const { data: newLink, error: insertError } = await supabase
       .from('affiliateLinks')
-      .insert([{ title, affiliateUrl: affiliateUrl, displayText: displayText || null }]) // Ensure mapping matches DB column names
+      .insert([{ title, affiliateUrl: affiliateUrl, displayText: displayText || null }]) 
       .select('id, title, "affiliateUrl", "displayText", created_at')
       .single();
 
@@ -134,7 +155,7 @@ export async function addAffiliateLink(prevState: AdminActionState | undefined, 
     }
     return { success: true, message: 'Affiliate link added successfully.', data: newLink as CourseLink };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in addAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in addAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to add link: The operation violates the database security policy. Ensure your admin account has permissions to add to 'affiliateLinks'. (Error: ${error.message})` };
     }
@@ -187,8 +208,6 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
     };
   }
 
-  // Title cannot be updated via this form to maintain uniqueness and simplicity.
-  // Only affiliateUrl and displayText are updated.
   const { affiliateUrl, displayText } = validatedFields.data;
   const updatedData: { "affiliateUrl": string; "displayText": string | null } = { 
     "affiliateUrl": affiliateUrl, 
@@ -212,7 +231,7 @@ export async function updateAffiliateLink(prevState: AdminActionState | undefine
 
     return { success: true, message: 'Affiliate link updated successfully.', data: updatedLink as CourseLink };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in updateAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in updateAffiliateLink. Error:", JSON.stringify(error, null, 2));
      if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to update link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -260,7 +279,7 @@ export async function deleteAffiliateLink(linkId: string): Promise<Omit<AdminAct
     }
     return { success: true, message: 'Affiliate link deleted successfully.' };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in deleteAffiliateLink. Error:", JSON.stringify(error, null, 2));
+    // console.error("[AdminAction] Catch block in deleteAffiliateLink. Error:", JSON.stringify(error, null, 2));
     if ((error as PostgrestError)?.message?.includes('violates row-level security policy')) {
         return { success: false, message: `Failed to delete link: The operation violates the database security policy. Ensure your admin account has permissions. (Error: ${error.message})` };
     }
@@ -301,8 +320,6 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
   }
   const { fullName } = validatedFields.data;
   try {
-    // Note: RLS policies on 'profiles' table must allow the user to update their own 'full_name' and 'updated_at'.
-    // It should ideally prevent them from updating their 'role'.
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: fullName, updated_at: new Date().toISOString() })
@@ -314,8 +331,184 @@ export async function updateUserProfile(prevState: UserProfileState | undefined,
     }
     return { success: true, message: 'Profile updated successfully.' };
   } catch (error: any) {
-    console.error("[AdminAction] Catch block in updateUserProfile. Error:", JSON.stringify(error, null, 2));
-    return { success: false, message: error.message || 'Failed to update profile.' };
+      console.error("Error updating user profile:", error);
+      return { success: false, message: error.message || 'Failed to update profile.' };
+    }
+  }
+
+
+// Server action to get user analytics data
+export async function getUserAnalyticsData(): Promise<AnalyticsActionState> {
+  const supabase = createServerActionClient({ cookies });
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = data?.user;
+
+  if (authError) {
+    console.error('[AdminAction/getUserAnalyticsData] Supabase auth.getUser() error:', JSON.stringify(authError, null, 2));
+    return { success: false, message: `Authentication error (Analytics): ${authError.message}. Please refresh or log in again.` };
+  }
+  if (!user) {
+    console.error('[AdminAction/getUserAnalyticsData] No authenticated user found for analytics.');
+    return { success: false, message: 'Analytics: User session not found. Please refresh or log in again.' };
+  }
+
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (profileError) {
+    console.error('[AdminAction/getUserAnalyticsData] Error fetching admin profile:', JSON.stringify(profileError, null, 2));
+    return { success: false, message: `Error fetching admin profile (Analytics): ${profileError.message}.` };
+  }
+  if (!profile || profile.role !== 'admin') {
+    return { success: false, message: 'Admin privileges required for analytics.' };
+  }
+
+  const analyticsData: UserAnalyticsData = {
+    totalUsers: 0,
+    newUsersThisWeek: 0,
+    fieldsOfStudy: [],
+    premiumVsFree: { premium: 0, free: 0 },
+    topRecommendedPaths: [],
+  };
+
+  try {
+    // Total Users
+    const { count: totalUsersCount, error: usersError } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true });
+    if (usersError) console.error('Error fetching total users:', JSON.stringify(usersError, null, 2));
+    else analyticsData.totalUsers = totalUsersCount || 0;
+
+    // New Users This Week
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { count: newUsersCount, error: newUsersError } = await supabase
+      .from('auth.users') 
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', sevenDaysAgo);
+    if (newUsersError) console.error('Error fetching new users:', JSON.stringify(newUsersError, null, 2));
+    else analyticsData.newUsersThisWeek = newUsersCount || 0;
+    
+    const { data: activityLogs, error: logsError } = await supabase
+        .from('user_activity_logs')
+        .select('activity_type, field_of_study, generated_path_names')
+        .limit(1000); // Fetch a sample of logs for client-side aggregation
+
+    if (logsError) {
+        console.error('Error fetching user_activity_logs:', JSON.stringify(logsError, null, 2));
+    } else if (activityLogs) {
+        const fieldCounts: Record<string, number> = {};
+        const pathCounts: Record<string, number> = {};
+
+        activityLogs.forEach(log => {
+            // Premium vs Free
+            if (log.activity_type === 'PREMIUM_REPORT_GENERATED') {
+                analyticsData.premiumVsFree.premium++;
+            } else if (log.activity_type === 'FREE_REPORT_GENERATED') {
+                analyticsData.premiumVsFree.free++;
+            }
+
+            // Fields of Study
+            if (log.field_of_study) {
+                fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
+            }
+
+            // Top Recommended Paths (first path)
+            if (log.generated_path_names && Array.isArray(log.generated_path_names) && log.generated_path_names.length > 0) {
+                const firstPath = log.generated_path_names[0];
+                 if (typeof firstPath === 'string') {
+                    pathCounts[firstPath] = (pathCounts[firstPath] || 0) + 1;
+                }
+            }
+        });
+        analyticsData.fieldsOfStudy = Object.entries(fieldCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+        analyticsData.topRecommendedPaths = Object.entries(pathCounts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a,b) => b.count - a.count)
+            .slice(0,5);
+    }
+
+
+    return { success: true, message: 'User analytics fetched successfully.', data: analyticsData };
+  } catch (error: any) {
+    console.error('Error processing user analytics data:', JSON.stringify(error, null, 2));
+    return { success: false, message: `Failed to fetch user analytics: ${error.message}`, data: analyticsData }; 
   }
 }
-    
+
+// Server action to get report insights data
+export async function getReportInsightsData(): Promise<AnalyticsActionState> {
+    const supabase = createServerActionClient({ cookies });
+    const { data, error: authError } = await supabase.auth.getUser();
+    const user = data?.user;
+
+    if (authError) {
+        console.error('[AdminAction/getReportInsightsData] Supabase auth.getUser() error:', JSON.stringify(authError, null, 2));
+        return { success: false, message: `Authentication error (Report Insights): ${authError.message}. Please refresh or log in again.` };
+    }
+    if (!user) {
+        console.error('[AdminAction/getReportInsightsData] No authenticated user found for report insights.');
+        return { success: false, message: 'Report Insights: User session not found. Please refresh or log in again.' };
+    }
+
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (profileError) {
+        console.error('[AdminAction/getReportInsightsData] Error fetching admin profile:', JSON.stringify(profileError, null, 2));
+        return { success: false, message: `Error fetching admin profile (Report Insights): ${profileError.message}.` };
+    }
+    if (!profile || profile.role !== 'admin') {
+        return { success: false, message: 'Admin privileges required for report insights.' };
+    }
+
+    const insightsData: ReportInsightsData = {
+        totalReportsGenerated: 0,
+        premiumReportsGenerated: 0,
+        averageSkillReadiness: 0,
+        topGeneratedByField: [],
+    };
+
+    try {
+        const { data: reportLogs, error: logsError } = await supabase
+            .from('user_activity_logs')
+            .select('activity_type, field_of_study, skill_readiness_score')
+            .in('activity_type', ['FREE_REPORT_GENERATED', 'PREMIUM_REPORT_GENERATED']); // Fetch all relevant logs
+
+        if (logsError) {
+            console.error('Error fetching report logs for insights:', JSON.stringify(logsError, null, 2));
+        } else if (reportLogs) {
+            let totalSkillScore = 0;
+            let premiumReportCountForAvg = 0;
+            const fieldCounts: Record<string, number> = {};
+
+            reportLogs.forEach(log => {
+                insightsData.totalReportsGenerated++;
+                if (log.activity_type === 'PREMIUM_REPORT_GENERATED') {
+                    insightsData.premiumReportsGenerated++;
+                    if (log.skill_readiness_score !== null && log.skill_readiness_score !== undefined) {
+                        totalSkillScore += log.skill_readiness_score;
+                        premiumReportCountForAvg++;
+                    }
+                }
+                if (log.field_of_study) {
+                    fieldCounts[log.field_of_study] = (fieldCounts[log.field_of_study] || 0) + 1;
+                }
+            });
+
+            if (premiumReportCountForAvg > 0) {
+                insightsData.averageSkillReadiness = parseFloat((totalSkillScore / premiumReportCountForAvg).toFixed(1));
+            }
+             insightsData.topGeneratedByField = Object.entries(fieldCounts)
+                .map(([field, count]) => ({ field, count }))
+                .sort((a,b) => b.count - a.count)
+                .slice(0,5);
+        }
+
+        return { success: true, message: 'Report insights fetched successfully.', data: insightsData };
+
+    } catch (error: any) {
+        console.error('Error processing report insights data:', JSON.stringify(error, null, 2));
+        return { success: false, message: `Failed to fetch report insights: ${error.message}`, data: insightsData };
+    }
+}
+
+```
