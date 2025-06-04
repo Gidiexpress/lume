@@ -53,18 +53,8 @@ export default function LandingPage() {
                 Discover Your Path Now <ChevronRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <div className="mt-16 px-4 sm:px-0">
-              <Image
-                src="https://placehold.co/1200x600.png"
-                alt="Lume platform illustrating modern career development and technology"
-                width={1200}
-                height={600}
-                className="rounded-lg shadow-2xl mx-auto max-w-full h-auto"
-                data-ai-hint="career success presentation"
-                priority
-              />
-            </div>
           </div>
+
         </section>
 
         {/* Features Section */}
